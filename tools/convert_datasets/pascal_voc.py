@@ -9,7 +9,6 @@ from mmdet.core import voc_classes
 
 label_ids = {name: i + 1 for i, name in enumerate(voc_classes())}
 
-
 def parse_xml(args):
     xml_path, img_path = args
     tree = ET.parse(xml_path)

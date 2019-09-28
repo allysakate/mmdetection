@@ -37,12 +37,14 @@ class LoadAnnotations(object):
     def __init__(self,
                  with_bbox=True,
                  with_label=True,
+                 with_trackid=True,
                  with_mask=False,
                  with_seg=False,
                  poly2mask=True,
                  skip_img_without_anno=True):
         self.with_bbox = with_bbox
         self.with_label = with_label
+        self.with_trackid = with_trackid
         self.with_mask = with_mask
         self.with_seg = with_seg
         self.poly2mask = poly2mask
@@ -64,6 +66,10 @@ class LoadAnnotations(object):
 
     def _load_labels(self, results):
         results['gt_labels'] = results['ann_info']['labels']
+        return results
+
+    def _load_trackids(self, results):
+        results['gt_trackids'] = results['ann_info']['trackids']
         return results
 
     def _poly2mask(self, mask_ann, img_h, img_w):
@@ -103,6 +109,8 @@ class LoadAnnotations(object):
                 return None
         if self.with_label:
             results = self._load_labels(results)
+        if self.with_trackid:
+            results = self._load_trackids(results)
         if self.with_mask:
             results = self._load_masks(results)
         if self.with_seg:
@@ -111,9 +119,9 @@ class LoadAnnotations(object):
 
     def __repr__(self):
         repr_str = self.__class__.__name__
-        repr_str += ('(with_bbox={}, with_label={}, with_mask={},'
-                     ' with_seg={})').format(self.with_bbox, self.with_label,
-                                             self.with_mask, self.with_seg)
+        repr_str += ('(with_bbox={}, with_label={}, with_trackid={}, with_mask={},'
+                     ' with_seg={})').format(self.with_bbox, self.with_label, 
+                            self.with_trackid, self.with_mask, self.with_seg)
         return repr_str
 
 

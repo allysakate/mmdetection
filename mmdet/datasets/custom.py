@@ -16,13 +16,17 @@ class CustomDataset(Dataset):
     [
         {
             'filename': 'a.jpg',
+            'videoname': 'a'
+            'frameid' : n
             'width': 1280,
             'height': 720,
             'ann': {
                 'bboxes': <np.ndarray> (n, 4),
                 'labels': <np.ndarray> (n, ),
+                'trackid': <np.ndarray> (n, ),
                 'bboxes_ignore': <np.ndarray> (k, 4), (optional field)
-                'labels_ignore': <np.ndarray> (k, 4) (optional field)
+                'labels_ignore': <np.ndarray> (k,) (optional field)
+                'trackid_ignore': <np.ndarray> (k,) (optional field)
             }
         },
         ...
@@ -40,13 +44,15 @@ class CustomDataset(Dataset):
                  img_prefix=None,
                  seg_prefix=None,
                  proposal_file=None,
-                 test_mode=False):
+                 test_mode=False,
+                 ann_dict = dict()):
         self.ann_file = ann_file
         self.data_root = data_root
         self.img_prefix = img_prefix
         self.seg_prefix = seg_prefix
         self.proposal_file = proposal_file
         self.test_mode = test_mode
+        self.ann_dict = ann_dict
 
         # join paths if data_root is specified
         if self.data_root is not None:
@@ -61,7 +67,7 @@ class CustomDataset(Dataset):
                 self.proposal_file = osp.join(self.data_root,
                                               self.proposal_file)
         # load annotations (and proposals)
-        self.img_infos = self.load_annotations(self.ann_file)
+        self.img_infos = self.load_annotations(self.ann_file, self.ann_dict)
         if self.proposal_file is not None:
             self.proposals = self.load_proposals(self.proposal_file)
         else:

@@ -14,6 +14,7 @@ from mmdet.apis import init_dist
 from mmdet.core import coco_eval, results2json, wrap_fp16_model
 from mmdet.datasets import build_dataloader, build_dataset
 from mmdet.models import build_detector
+from tools.voc_eval import voc_eval
 
 
 def single_gpu_test(model, data_loader, show=False):
@@ -199,7 +200,7 @@ def main():
             else:
                 if not isinstance(outputs[0], dict):
                     result_files = results2json(dataset, outputs, args.out)
-                    coco_eval(result_files, eval_types, dataset.coco)
+                    coco_eval(result_files, eval_types, dataset)
                 else:
                     for name in outputs[0]:
                         print('\nEvaluating {}'.format(name))
@@ -208,6 +209,10 @@ def main():
                         result_files = results2json(dataset, outputs_,
                                                     result_file)
                         coco_eval(result_files, eval_types, dataset.coco)
+        else:
+            print('Starting evaluate using voc_eval')
+            result_file = args.out
+            voc_eval(result_file,dataset)
 
     # Save predictions in the COCO json format
     if args.json_out and rank == 0:

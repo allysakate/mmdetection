@@ -12,6 +12,10 @@ def voc_classes():
         'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'
     ]
 
+def mot17_class():
+    return [
+        'pedestrian'
+    ]
 
 def imagenet_det_classes():
     return [

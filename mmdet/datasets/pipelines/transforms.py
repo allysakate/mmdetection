@@ -344,6 +344,8 @@ class RandomCrop(object):
             results['gt_bboxes'] = gt_bboxes[valid_inds, :]
             if 'gt_labels' in results:
                 results['gt_labels'] = results['gt_labels'][valid_inds]
+            if 'gt_trackids' in results:
+                results['gt_trackids'] = results['gt_trackids'][valid_inds]
 
             # filter and crop the masks
             if 'gt_masks' in results:
@@ -566,8 +568,8 @@ class MinIoURandomCrop(object):
         self.min_crop_size = min_crop_size
 
     def __call__(self, results):
-        img, boxes, labels = [
-            results[k] for k in ('img', 'gt_bboxes', 'gt_labels')
+        img, boxes, labels, trackids = [
+            results[k] for k in ('img', 'gt_bboxes', 'gt_labels', 'gt_trackids')
         ]
         h, w, c = img.shape
         while True:
@@ -613,6 +615,7 @@ class MinIoURandomCrop(object):
                 results['img'] = img
                 results['gt_bboxes'] = boxes
                 results['gt_labels'] = labels
+                results['gt_trackids'] = trackids
 
                 if 'gt_masks' in results:
                     valid_masks = [

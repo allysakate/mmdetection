@@ -16,7 +16,7 @@ class XMLDataset(CustomDataset):
         self.cat2label = {cat: i + 1 for i, cat in enumerate(self.CLASSES)}
         self.min_size = min_size
 
-    def load_annotations(self, ann_file):
+    def load_annotations(self, ann_file, ann_dict):
         img_infos = []
         img_ids = mmcv.list_from_file(ann_file)
         for img_id in img_ids:

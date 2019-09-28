@@ -118,3 +118,13 @@ work_dirs/
 
 # Pytorch
 *.pth
+
+#datasets
+data/
+
+#configs
+configs/*
+
+#results
+results/*.json
+results/*.pkl
