@@ -1,3 +1,4 @@
+#Usage: python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/fast_rcnn_r101_fpn_1x_20181129-ffaa2eb0.pth  --out results.pkl
 import argparse
 import os
 import os.path as osp
@@ -169,6 +170,7 @@ def main():
 
     # build the model and load checkpoint
     model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
+    print(model)
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
