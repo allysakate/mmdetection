@@ -22,7 +22,7 @@ class FCNMaskHead(nn.Module):
                  conv_out_channels=256,
                  upsample_method='deconv',
                  upsample_ratio=2,
-                 num_classes=81,
+                 num_classes=5,
                  class_agnostic=False,
                  conv_cfg=None,
                  norm_cfg=None,

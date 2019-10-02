@@ -122,9 +122,9 @@ work_dirs/
 #datasets
 data/
 
-#configs
-configs/*
-
 #results
 results/*.json
 results/*.pkl
+
+#build from cfg
+build_from_cfg/

@@ -98,8 +98,8 @@ test_cfg = dict(
     # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
 )
 # dataset settings
-dataset_type = 'CocoDataset'
-data_root = 'data/coco/'
+dataset_type = 'MOTDataset'
+data_root = 'data/CVAT/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -132,18 +132,18 @@ data = dict(
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_train2017.json',
-        img_prefix=data_root + 'train2017/',
+        ann_file=data_root + 'train/train.pkl',
+        img_prefix=data_root + 'train/images/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_val2017.json',
-        img_prefix=data_root + 'val2017/',
+        ann_file=data_root + 'test/test.pkl',
+        img_prefix=data_root + 'test/images/',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_val2017.json',
-        img_prefix=data_root + 'val2017/',
+        ann_file=data_root + 'test/test.pkl',
+        img_prefix=data_root + 'test/images/',
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
@@ -172,3 +172,28 @@ work_dir = './work_dirs/faster_rcnn_r101_fpn_1x'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
+
+tracktor = dict(
+    reid_weights='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/ResNet_iter_25245.pth',
+    reid_config='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/sacred_config.yaml',
+    interpolate=False,
+    write_images=False ,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
+    frame_split=[0.0, 1.0],  # [start percentage, end percentage], e.g., [0.0, 0.5] for train and [0.75, 1.0] for val split.
+    tracker=dict(        
+        detection_thresh=0.5,
+        regression_thresh=0.5,    #score threshold for keeping the track alive
+        detection_nms_thresh=0.3,        #NMS threshold for detection
+        regression_nms_thresh=0.6,       # NMS theshold while tracking
+        motion_model=False,              # use a constant velocity assumption v_t = x_t - x_t-1
+        # DPM or DPM_RAW or 0, raw includes the unfiltered (no nms) versions of the provided detections,
+        public_detections=True,          # 0 tells the tracker to use private detections (Faster R-CNN)
+        max_features_num=10,             # How much last appearance features are to keep
+        do_align=True,                   # Do camera motion compensation
+        warp_mode='cv2.MOTION_EUCLIDEAN',  # Which warp mode to use (cv2.MOTION_EUCLIDEAN, cv2.MOTION_AFFINE, ...)
+        number_of_iterations=100,        # maximal number of iterations (original 50)
+        termination_eps=0.00001,         # Threshold increment between two iterations (original 0.001)
+        do_reid=True,                    # Use siamese network to do reid
+        inactive_patience=10,            # How much timesteps dead tracks are kept and cosidered for reid
+        reid_sim_threshold=2.0,          # How similar do image and old track need to be to be considered the same person
+        reid_iou_threshold=0.2)         # How much IoU do track and image need to be considered for matching
+)        

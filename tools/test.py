@@ -16,13 +16,23 @@ from mmdet.core import coco_eval, results2json, wrap_fp16_model
 from mmdet.datasets import build_dataloader, build_dataset
 from mmdet.models import build_detector
 from tools.voc_eval import voc_eval
+from mmdet.models.tracktor import resnet50
+from mmdet.models.tracktor import Tracker
 
-
-def single_gpu_test(model, data_loader, show=False):
+def single_gpu_test(model,data_loader,show=False, 
+                    tracktor_cfg=None,nms_cfg=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
+
+    reid_network = resnet50(pretrained=False, output_dim=128)
+    reid_network.load_state_dict(torch.load(tracktor_cfg.reid_weights))
+    reid_network.eval()
+    reid_network.cuda()
+
+    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, nms_cfg)
+
     for i, data in enumerate(data_loader):
         with torch.no_grad():
             result = model(return_loss=False, rescale=not show, **data)
@@ -34,10 +44,12 @@ def single_gpu_test(model, data_loader, show=False):
         batch_size = data['img'][0].size(0)
         for _ in range(batch_size):
             prog_bar.update()
+    print(results)
     return results
 
 
-def multi_gpu_test(model, data_loader, tmpdir=None):
+def multi_gpu_test(model, data_loader, tmpdir=None, 
+                    tracktor_cfg=None,nms_cfg=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -170,7 +182,6 @@ def main():
 
     # build the model and load checkpoint
     model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
-    print(model)
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
@@ -184,47 +195,19 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
-        outputs = single_gpu_test(model, data_loader, args.show)
+        outputs = single_gpu_test(model, data_loader, args.show, 
+                    tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
     else:
         model = MMDistributedDataParallel(model.cuda())
-        outputs = multi_gpu_test(model, data_loader, args.tmpdir)
+        outputs = multi_gpu_test(model, data_loader, args.tmpdir,
+                    tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
 
     rank, _ = get_dist_info()
     if args.out and rank == 0:
         print('\nwriting results to {}'.format(args.out))
         mmcv.dump(outputs, args.out)
-        eval_types = args.eval
-        if eval_types:
-            print('Starting evaluate {}'.format(' and '.join(eval_types)))
-            if eval_types == ['proposal_fast']:
-                result_file = args.out
-                coco_eval(result_file, eval_types, dataset.coco)
-            else:
-                if not isinstance(outputs[0], dict):
-                    result_files = results2json(dataset, outputs, args.out)
-                    coco_eval(result_files, eval_types, dataset)
-                else:
-                    for name in outputs[0]:
-                        print('\nEvaluating {}'.format(name))
-                        outputs_ = [out[name] for out in outputs]
-                        result_file = args.out + '.{}'.format(name)
-                        result_files = results2json(dataset, outputs_,
-                                                    result_file)
-                        coco_eval(result_files, eval_types, dataset.coco)
-        else:
-            print('Starting evaluate using voc_eval')
-            result_file = args.out
-            voc_eval(result_file,dataset)
-
-    # Save predictions in the COCO json format
-    if args.json_out and rank == 0:
-        if not isinstance(outputs[0], dict):
-            results2json(dataset, outputs, args.json_out)
-        else:
-            for name in outputs[0]:
-                outputs_ = [out[name] for out in outputs]
-                result_file = args.json_out + '.{}'.format(name)
-                results2json(dataset, outputs_, result_file)
+        print('Starting evaluate using voc_eval')
+        voc_eval(args.out,dataset)
 
 
 if __name__ == '__main__':

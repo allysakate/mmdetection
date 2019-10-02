@@ -8,6 +8,8 @@ from .custom import CustomDataset
 @DATASETS.register_module
 class MOTDataset(CustomDataset):
 
+    CLASSES = ('1981_Series', '2003_Series', '2014_Series', 'Others')
+
     def load_annotations(self, ann_file, ann_dict):
         img_infos = []
 
