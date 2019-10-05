@@ -180,10 +180,10 @@ tracktor = dict(
     write_images=False ,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
     frame_split=[0.0, 1.0],  # [start percentage, end percentage], e.g., [0.0, 0.5] for train and [0.75, 1.0] for val split.
     tracker=dict(        
-        detection_thresh=0.0001,
-        regression_thresh=0.5,          #score threshold for keeping the track alive
-        detection_nms_thresh=0.3,        #NMS threshold for detection
-        regression_nms_thresh=0.3,       # NMS theshold while tracking
+        detection_thresh=0.005,
+        regression_thresh=0.005,          #score threshold for keeping the track alive
+        detection_nms_thresh=0.003,        #NMS threshold for detection
+        regression_nms_thresh=0.003,       # NMS theshold while tracking
         motion_model=False,              # use a constant velocity assumption v_t = x_t - x_t-1
         # DPM or DPM_RAW or 0, raw includes the unfiltered (no nms) versions of the provided detections,
         public_detections=True,          # 0 tells the tracker to use private detections (Faster R-CNN)
@@ -196,8 +196,6 @@ tracktor = dict(
         inactive_patience=10,            # How much timesteps dead tracks are kept and cosidered for reid
         reid_sim_threshold=2.0,          # How similar do image and old track need to be to be considered the same person
         reid_iou_threshold=0.2,         # How much IoU do track and image need to be considered for matching
-        img_scale = (1333, 800),
-        reid_mean=[123.675, 116.28, 103.53],
-        reid_std=[58.395, 57.12, 57.375]
+        img_scale = (1333, 800)
     )
 )        

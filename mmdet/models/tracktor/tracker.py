@@ -97,7 +97,7 @@ class Tracker():
 		if len(self.tracks) == 1:
 			pos = [self.tracks[0].pos]
 		elif len(self.tracks) > 1:
-			pos = torch.cat([t.pos for t in self.tracks],0)
+			pos = torch.stack([t.pos for t in self.tracks])
 		else:
 			pos = torch.zeros(0).cuda()
 		return pos
@@ -126,7 +126,7 @@ class Tracker():
 		"""Tries to ReID inactive tracks with provided detections."""
 
 		img_meta=blob['img_meta'][0].data[0]
-		new_det_features = self.reid_network.test_rois(img_meta[0]['reid_img'], new_det_pos / img_meta[0]['scale_factor']).data
+		new_det_features = self.reid_network.test_rois(img_meta[0]['reid_img'], new_det_pos / img_meta[0]['scale_factor']).data		
 		if len(self.inactive_tracks) >= 1 and self.do_reid:
 			# calculate appearance distances
 			dist_mat = []
@@ -330,20 +330,18 @@ class Tracker():
 			scores = F.softmax(scores, dim=1) if scores is not None else None
 			scores = scores[:, self.cl]
 			inds = torch.gt(scores, self.detection_thresh).nonzero().view(-1)
-		#	print(f'rois.nelement() > 0: {inds}')
+	#		print(f'rois.nelement() > 0: {inds}')
 		else:
 			inds = torch.zeros(0).cuda()
-		#	print(f'rois.nelement() < 0: {inds}')
 
 		if inds.nelement() > 0:
 			boxes = boxes[inds]
 			det_pos = boxes[:, self.cl*4:(self.cl+1)*4]
 			det_scores = scores[inds]
-		#	print(f'inds.nelement() > 0: {det_pos}, {det_scores}')
+	#		print(f'inds.nelement() > 0: {det_pos}, {det_scores}')
 		else:
 			det_pos = torch.zeros(0).cuda()
 			det_scores = torch.zeros(0).cuda()
-		#	print(f'inds.nelement() < 0: {det_pos}, {det_scores}')
 
 		##################
 		# Predict tracks #
@@ -351,18 +349,18 @@ class Tracker():
 		num_tracks = 0
 		nms_inp_reg = torch.zeros(0).cuda()
 		if len(self.tracks):
-		#	print(f'len_tracks {len(self.tracks)}')
+	#		print(f'len_tracks {len(self.tracks)}')
 			# align
 			if self.do_align:
-		#		print('do_align')
+				print('do_align')
 				self.align(blob)
 			# apply motion model
 			if self.motion_model:
-		#		print('motion model')
+				print('motion model')
 				self.motion()
 			#regress
 			regress_scores = self.regress_tracks(blob)
-		#	print(f'regress_scores: {regress_scores}')
+	#		print(f'regress_scores: {regress_scores}')
 
 			if len(self.tracks):
 
@@ -376,9 +374,17 @@ class Tracker():
 				nms_op = getattr(nms_wrapper, nms_type)
 				nms_inp_reg_keep = nms_op(nms_inp_reg, self.regression_nms_thresh)
 
+				
+	#			print(f'nms_inp_reg_keep: {nms_inp_reg_keep}')
+				for i in list(range(len(nms_inp_reg_keep))):
+	#				print(f'nms {nms_inp_reg_keepd[i]}')
+				
+				for i in list(range(len(self.tracks))):
+	#				print(f'tracks {self.tracks[i]}') 
+				
 				self.tracks_to_inactive([self.tracks[i]
 				                         for i in list(range(len(self.tracks)))
-				                         if self.tracks[i] not in nms_inp_reg_keep])
+				                         if self.tracks[i] not in nms_inp_reg_keep[0]])
 
 				if len(nms_inp_reg_keep) > 0:
 					nms_inp_reg = torch.cat((self.get_pos(), torch.ones(self.get_pos().size(0)).add_(3).view(-1,1).cuda()),1)
@@ -416,13 +422,16 @@ class Tracker():
 					nms_inp_det = nms_inp_det.new(0)
 					break
 				nms_inp_det = nms_inp_keep
-
+		
 		if len(nms_inp_det) > 0:
-			new_det_pos = nms_inp_det[0]
-			new_det_scores = nms_inp_det[1]
+			new_det_pos    = nms_inp_det[0][:,:4]
+			new_det_scores = nms_inp_det[0][:, 4]
+			new_det_inds   = nms_inp_det[1]
+	#		print(f'Inp_det: {nms_inp_det} | {new_det_pos} | {new_det_scores} | {new_det_inds}')
 
 			# try to redientify tracks
 			new_det_pos, new_det_scores, new_det_features = self.reid(blob, new_det_pos, new_det_scores)
+	#		print(f'reid::: {new_det_pos} | {new_det_scores}')
 
 			# add new
 			if new_det_pos.nelement() > 0:
