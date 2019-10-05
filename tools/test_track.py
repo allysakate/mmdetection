@@ -1,4 +1,4 @@
-#Usage: python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/fast_rcnn_r101_fpn_1x_20181129-ffaa2eb0.pth  --out results.pkl
+#Usage: python tools/test_track.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/fast_rcnn_r101_fpn_1x_20181129-ffaa2eb0.pth  --out results.pkl
 import argparse
 import os
 import os.path as osp
@@ -50,18 +50,19 @@ def multi_gpu_test(model, data_loader, tmpdir=None,
     rank, world_size = get_dist_info()
     if rank == 0:
         prog_bar = mmcv.ProgressBar(len(dataset))
+
+    reid_network = resnet50(pretrained=False, output_dim=128)
+    reid_network.load_state_dict(torch.load(tracktor_cfg.reid_weights))
+    reid_network.eval()
+    reid_network.cuda()
+
+    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, nms_cfg)
+
     for i, data in enumerate(data_loader):
-        with torch.no_grad():
-            result = model(return_loss=False, rescale=True, **data)
-        results.append(result)
-
+        tracker.step(data)
         if rank == 0:
-            batch_size = data['img'][0].size(0)
-            for _ in range(batch_size * world_size):
-                prog_bar.update()
-
-    # collect results from all ranks
-    results = collect_results(results, len(dataset), tmpdir)
+            prog_bar.update()
+    results = tracker.get_results()
 
     return results
 

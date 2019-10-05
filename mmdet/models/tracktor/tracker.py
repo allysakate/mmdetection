@@ -97,7 +97,8 @@ class Tracker():
 		if len(self.tracks) == 1:
 			pos = [self.tracks[0].pos]
 		elif len(self.tracks) > 1:
-			pos = torch.cat([t.pos for t in self.tracks],0)
+			pos = torch.stack([t.pos for t in self.tracks])
+			print(pos)
 		else:
 			pos = torch.zeros(0).cuda()
 		return pos
