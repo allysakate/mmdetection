@@ -60,6 +60,21 @@ class BBoxTestMixin(object):
             cfg=rcnn_test_cfg)
         return det_bboxes, det_labels
 
+    def simple_track_bboxes(self,
+                           x,
+                           img_meta,
+                           proposals,
+                           rcnn_test_cfg,
+                           rescale=False):
+        """Test only det bboxes without augmentation."""
+        rois = bbox2roi(proposals)
+        roi_feats = self.bbox_roi_extractor(
+            x[:len(self.bbox_roi_extractor.featmap_strides)], rois)
+        if self.with_shared_head:
+            roi_feats = self.shared_head(roi_feats)
+        cls_score, bbox_pred = self.bbox_head(roi_feats)
+        return cls_score, bbox_pred, rois
+
     def aug_test_bboxes(self, feats, img_metas, proposal_list, rcnn_test_cfg):
         aug_bboxes = []
         aug_scores = []

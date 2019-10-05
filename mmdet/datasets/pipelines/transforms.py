@@ -287,6 +287,8 @@ class Normalize(object):
     def __call__(self, results):
         results['img'] = mmcv.imnormalize(results['img'], self.mean, self.std,
                                           self.to_rgb)
+        results['reid_img'] = mmcv.imnormalize(results['reid_img'], self.mean, self.std,
+                                          self.to_rgb)
         results['img_norm_cfg'] = dict(
             mean=self.mean, std=self.std, to_rgb=self.to_rgb)
         return results

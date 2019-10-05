@@ -138,7 +138,7 @@ class Collect(object):
     def __init__(self,
                  keys,
                  meta_keys=('filename', 'ori_shape', 'img_shape', 'pad_shape',
-                            'scale_factor', 'flip', 'img_norm_cfg')):
+                            'scale_factor', 'flip', 'img_norm_cfg', 'reid_img')):
         self.keys = keys
         self.meta_keys = meta_keys
 

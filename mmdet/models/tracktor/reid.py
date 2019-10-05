@@ -30,7 +30,6 @@ class ResNet(models.ResNet):
         
         self.name = "ResNet"
 
-        self.avgpool = nn.AvgPool2d((8,4), stride=1)
         self.fc = nn.Linear(512 * block.expansion, 1024)
         self.bn_fc = nn.BatchNorm1d(1024)
         self.relu_fc = nn.ReLU(inplace=True)
@@ -79,7 +78,7 @@ class ResNet(models.ResNet):
 
     def build_crops(self, image, rois):
         res = []
-        trans = Compose([ToPILImage(), Resize((256,128)), ToTensor()])
+        trans = Compose([ToPILImage(), Resize((128,400)), ToTensor()])
         for r in rois:
             x0 = int(r[0])
             y0 = int(r[1])
@@ -95,7 +94,8 @@ class ResNet(models.ResNet):
                     y0 -= 1
                 else:
                     y1 += 1
-            im = image[0,:,y0:y1,x0:x1]
+            im = image[:,y0:y1,x0:x1]
+            im = torch.from_numpy(im)
             im = trans(im)
             res.append(im)
         res = torch.stack(res, 0)

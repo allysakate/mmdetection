@@ -24,6 +24,9 @@ class LoadImageFromFile(object):
         results['img'] = img
         results['img_shape'] = img.shape
         results['ori_shape'] = img.shape
+        results['reid_img'] = img
+
+
         return results
 
     def __repr__(self):
