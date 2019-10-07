@@ -81,7 +81,7 @@ class ToDataContainer(object):
 
     def __init__(self,
                  fields=(dict(key='img', stack=True), dict(key='gt_bboxes'),
-                         dict(key='gt_labels'), dict(key='gt_trackids'))):
+                         dict(key='gt_labels'), dict(key='gt_texts'))):
         self.fields = fields
 
     def __call__(self, results):
@@ -100,7 +100,7 @@ class DefaultFormatBundle(object):
     """Default formatting bundle.
 
     It simplifies the pipeline of formatting common fields, including "img",
-    "proposals", "gt_bboxes", "gt_labels", "gt_masks" and "gt_semantic_seg".
+    "proposals", "gt_bboxes", "gt_labels", "gt_texts", "gt_masks" and "gt_semantic_seg".
     These fields are formatted as follows.
 
     - img: (1)transpose, (2)to tensor, (3)to DataContainer (stack=True)
@@ -108,6 +108,7 @@ class DefaultFormatBundle(object):
     - gt_bboxes: (1)to tensor, (2)to DataContainer
     - gt_bboxes_ignore: (1)to tensor, (2)to DataContainer
     - gt_labels: (1)to tensor, (2)to DataContainer
+    - gt_texts: (1)to tensor, (2)to DataContainer
     - gt_masks: (1)to tensor, (2)to DataContainer (cpu_only=True)
     - gt_semantic_seg: (1)unsqueeze dim-0 (2)to tensor,
                        (3)to DataContainer (stack=True)
@@ -117,7 +118,7 @@ class DefaultFormatBundle(object):
         if 'img' in results:
             img = np.ascontiguousarray(results['img'].transpose(2, 0, 1))
             results['img'] = DC(to_tensor(img), stack=True)
-        for key in ['proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels', 'gt_trackids']:
+        for key in ['proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels', 'gt_texts', 'gt_trackids']:
             if key not in results:
                 continue
             results[key] = DC(to_tensor(results[key]))

@@ -1,8 +1,8 @@
 from torch import nn
 
 from mmdet.utils import build_from_cfg
-from .registry import (BACKBONES, DETECTORS, TRACKERS, HEADS, LOSSES, NECKS,
-                       ROI_EXTRACTORS, SHARED_HEADS)
+from .registry import (BACKBONES, DETECTORS, HEADS, LOSSES, NECKS,
+                       ROI_EXTRACTORS, SHARED_HEADS, RECOG_HEADS)
 
 
 def build(cfg, registry, default_args=None):
@@ -38,9 +38,8 @@ def build_head(cfg):
 def build_loss(cfg):
     return build(cfg, LOSSES)
 
+def build_recog_head(cfg):
+    return build(cfg, RECOG_HEADS)
 
 def build_detector(cfg, train_cfg=None, test_cfg=None):
     return build(cfg, DETECTORS, dict(train_cfg=train_cfg, test_cfg=test_cfg))
-
-#def build_tracktor(cfg):
-#    return build(cfg, TRACKERS)

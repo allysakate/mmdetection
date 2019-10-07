@@ -411,6 +411,7 @@ class RepPointsHead(nn.Module):
              pts_preds_refine,
              gt_bboxes,
              gt_labels,
+             gt_texts,
              img_metas,
              cfg,
              gt_bboxes_ignore=None):
@@ -439,6 +440,7 @@ class RepPointsHead(nn.Module):
             cfg.init,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
+            gt_texts_list=gt_texts,
             label_channels=label_channels,
             sampling=self.sampling)
         (*_, bbox_gt_list_init, candidate_list_init, bbox_weights_list_init,
@@ -472,6 +474,7 @@ class RepPointsHead(nn.Module):
             cfg.refine,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
+            gt_texts_list=gt_texts,
             label_channels=label_channels,
             sampling=self.sampling)
         (labels_list, label_weights_list, bbox_gt_list_refine,

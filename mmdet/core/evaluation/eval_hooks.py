@@ -78,6 +78,7 @@ class DistEvalmAPHook(DistEvalHook):
     def evaluate(self, runner, results):
         gt_bboxes = []
         gt_labels = []
+        gt_texts = []
         gt_ignore = []
         for i in range(len(self.dataset)):
             ann = self.dataset.get_ann_info(i)
@@ -93,6 +94,7 @@ class DistEvalmAPHook(DistEvalHook):
                 labels = np.concatenate([labels, ann['labels_ignore']])
             gt_bboxes.append(bboxes)
             gt_labels.append(labels)
+            gt_texts.append(texts)
         if not gt_ignore:
             gt_ignore = None
         # If the dataset is VOC2007, then use 11 points mAP evaluation.
@@ -104,6 +106,7 @@ class DistEvalmAPHook(DistEvalHook):
             results,
             gt_bboxes,
             gt_labels,
+            gt_texts,
             gt_ignore=gt_ignore,
             scale_ranges=None,
             iou_thr=0.5,

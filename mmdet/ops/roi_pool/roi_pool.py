@@ -12,7 +12,10 @@ class RoIPoolFunction(Function):
     @staticmethod
     def forward(ctx, features, rois, out_size, spatial_scale):
         assert features.is_cuda
-        out_h, out_w = _pair(out_size)
+        if isinstance(out_size,int):
+            out_h, out_w = _pair(out_size)
+        else:
+            out_h, out_w = out_size
         assert isinstance(out_h, int) and isinstance(out_w, int)
         ctx.save_for_backward(rois)
         num_channels = features.size(1)
@@ -54,8 +57,10 @@ class RoIPool(nn.Module):
 
     def __init__(self, out_size, spatial_scale, use_torchvision=False):
         super(RoIPool, self).__init__()
-
-        self.out_size = _pair(out_size)
+        if isinstance(out_size,int):
+            self.out_size = _pair(out_size)
+        else:
+            self.out_size = out_size
         self.spatial_scale = float(spatial_scale)
         self.use_torchvision = use_torchvision
 

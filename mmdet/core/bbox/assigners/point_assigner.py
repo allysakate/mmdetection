@@ -19,7 +19,7 @@ class PointAssigner(BaseAssigner):
         self.scale = scale
         self.pos_num = pos_num
 
-    def assign(self, points, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
+    def assign(self, points, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None, gt_texts=None):
         """Assign gt to points.
 
         This method assign a gt bbox to every points set, each points set
@@ -41,6 +41,7 @@ class PointAssigner(BaseAssigner):
             gt_bboxes_ignore (Tensor, optional): Ground truth bboxes that are
                 labelled as `ignored`, e.g., crowd boxes in COCO.
             gt_labels (Tensor, optional): Label of gt_bboxes, shape (k, ).
+            gt_texts (Tensor, optional): Text of gt_bboxes, shape (k, ).
 
         Returns:
             :obj:`AssignResult`: The assign result.
@@ -112,5 +113,15 @@ class PointAssigner(BaseAssigner):
         else:
             assigned_labels = None
 
+        if gt_texts is not None:
+            assigned_texts = assigned_gt_inds.new_zeros((num_bboxes, ))
+            pos_inds = torch.nonzero(assigned_gt_inds > 0).squeeze()
+            if pos_inds.numel() > 0:
+                assigned_texts[pos_inds] = gt_texts[
+                    assigned_gt_inds[pos_inds] - 1]
+        else:
+            assigned_texts = None
+
+
         return AssignResult(
-            num_gts, assigned_gt_inds, None, labels=assigned_labels)
+            num_gts, assigned_gt_inds, None, labels=assigned_labels, texts=assigned_texts)

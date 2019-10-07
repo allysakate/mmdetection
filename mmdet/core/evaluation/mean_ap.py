@@ -220,6 +220,7 @@ def get_cls_results(det_results, gt_bboxes, gt_labels, gt_ignore, class_id):
 def eval_map(det_results,
              gt_bboxes,
              gt_labels,
+             gt_texts,
              gt_ignore=None,
              scale_ranges=None,
              iou_thr=0.5,
@@ -232,6 +233,7 @@ def eval_map(det_results,
         gt_bboxes (list): ground truth bboxes of each image, a list of K*4
             array.
         gt_labels (list): ground truth labels of each image, a list of K array
+        gt_texts (list): ground truth texts of each image, a list of K array
         gt_ignore (list): gt ignore indicators of each image, a list of K array
         scale_ranges (list, optional): [(min1, max1), (min2, max2), ...]
         iou_thr (float): IoU threshold

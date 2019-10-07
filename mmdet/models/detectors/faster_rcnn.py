@@ -14,6 +14,7 @@ class FasterRCNN(TwoStageDetector):
                  test_cfg,
                  neck=None,
                  shared_head=None,
+                 recog_head=None,
                  pretrained=None):
         super(FasterRCNN, self).__init__(
             backbone=backbone,
@@ -22,6 +23,7 @@ class FasterRCNN(TwoStageDetector):
             rpn_head=rpn_head,
             bbox_roi_extractor=bbox_roi_extractor,
             bbox_head=bbox_head,
+            recog_head=recog_head,
             train_cfg=train_cfg,
             test_cfg=test_cfg,
             pretrained=pretrained)

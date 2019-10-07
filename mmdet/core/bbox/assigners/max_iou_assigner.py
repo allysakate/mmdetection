@@ -44,7 +44,7 @@ class MaxIoUAssigner(BaseAssigner):
         self.ignore_iof_thr = ignore_iof_thr
         self.ignore_wrt_candidates = ignore_wrt_candidates
 
-    def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
+    def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None, gt_texts=None):
         """Assign gt to bboxes.
 
         This method assign a gt bbox to every bbox (proposal/anchor), each bbox
@@ -66,6 +66,8 @@ class MaxIoUAssigner(BaseAssigner):
             gt_bboxes_ignore (Tensor, optional): Ground truth bboxes that are
                 labelled as `ignored`, e.g., crowd boxes in COCO.
             gt_labels (Tensor, optional): Label of gt_bboxes, shape (k, ).
+            gt_texts (Tensor, optional): Text of gt_bboxes, shape (k, ).
+
 
         Returns:
             :obj:`AssignResult`: The assign result.
@@ -87,16 +89,18 @@ class MaxIoUAssigner(BaseAssigner):
                 ignore_max_overlaps, _ = ignore_overlaps.max(dim=0)
             overlaps[:, ignore_max_overlaps > self.ignore_iof_thr] = -1
 
-        assign_result = self.assign_wrt_overlaps(overlaps, gt_labels)
+        assign_result = self.assign_wrt_overlaps(overlaps, gt_labels, gt_texts)
         return assign_result
 
-    def assign_wrt_overlaps(self, overlaps, gt_labels=None):
+    def assign_wrt_overlaps(self, overlaps, gt_labels=None, gt_texts=None):
         """Assign w.r.t. the overlaps of bboxes with gts.
 
         Args:
             overlaps (Tensor): Overlaps between k gt_bboxes and n bboxes,
                 shape(k, n).
             gt_labels (Tensor, optional): Labels of k gt_bboxes, shape (k, ).
+            gt_texts (Tensor, optional): Texts of k gt_bboxes, shape (k, ).
+
 
         Returns:
             :obj:`AssignResult`: The assign result.
@@ -149,5 +153,14 @@ class MaxIoUAssigner(BaseAssigner):
         else:
             assigned_labels = None
 
+        if gt_texts is not None:
+            assigned_texts = assigned_gt_inds.new_zeros((num_bboxes, ))
+            pos_inds = torch.nonzero(assigned_gt_inds > 0).squeeze()
+            if pos_inds.numel() > 0:
+                assigned_texts[pos_inds] = gt_texts[
+                    assigned_gt_inds[pos_inds] - 1]
+        else:
+            assigned_texts = None
+
         return AssignResult(
-            num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
+            num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels,  texts=assigned_texts)

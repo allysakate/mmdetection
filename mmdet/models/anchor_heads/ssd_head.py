@@ -137,6 +137,7 @@ class SSDHead(AnchorHead):
              bbox_preds,
              gt_bboxes,
              gt_labels,
+             gt_texts,
              img_metas,
              cfg,
              gt_bboxes_ignore=None):
@@ -155,6 +156,7 @@ class SSDHead(AnchorHead):
             cfg,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
+            gt_texts_list=gt_texts,
             label_channels=1,
             sampling=False,
             unmap_outputs=False)

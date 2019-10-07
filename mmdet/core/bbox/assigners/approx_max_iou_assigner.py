@@ -49,7 +49,8 @@ class ApproxMaxIoUAssigner(MaxIoUAssigner):
                approxs_per_octave,
                gt_bboxes,
                gt_bboxes_ignore=None,
-               gt_labels=None):
+               gt_labels=None,
+               gt_texts=None):
         """Assign gt to approxs.
 
         This method assign a gt bbox to each group of approxs (bboxes),
@@ -77,6 +78,7 @@ class ApproxMaxIoUAssigner(MaxIoUAssigner):
             gt_bboxes_ignore (Tensor, optional): Ground truth bboxes that are
                 labelled as `ignored`, e.g., crowd boxes in COCO.
             gt_labels (Tensor, optional): Label of gt_bboxes, shape (k, ).
+            gt_texts (Tensor, optional): Text of gt_bboxes, shape (k, ).
 
         Returns:
             :obj:`AssignResult`: The assign result.
@@ -110,5 +112,5 @@ class ApproxMaxIoUAssigner(MaxIoUAssigner):
                 ignore_max_overlaps, _ = ignore_overlaps.max(dim=0)
             overlaps[:, ignore_max_overlaps > self.ignore_iof_thr] = -1
 
-        assign_result = self.assign_wrt_overlaps(overlaps, gt_labels)
+        assign_result = self.assign_wrt_overlaps(overlaps, gt_labels, gt_texts)
         return assign_result

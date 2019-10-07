@@ -398,6 +398,7 @@ class GuidedAnchorHead(AnchorHead):
              loc_preds,
              gt_bboxes,
              gt_labels,
+             gt_texts,
              img_metas,
              cfg,
              gt_bboxes_ignore=None):
@@ -451,6 +452,7 @@ class GuidedAnchorHead(AnchorHead):
             cfg,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
+            gt_texts_list=gt_texts,
             label_channels=label_channels,
             sampling=sampling)
         if cls_reg_targets is None:

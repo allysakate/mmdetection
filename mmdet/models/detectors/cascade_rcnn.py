@@ -154,6 +154,7 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
                       img_meta,
                       gt_bboxes,
                       gt_labels,
+                      gt_texts,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       proposals=None):
@@ -194,12 +195,13 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
                 for j in range(num_imgs):
                     assign_result = bbox_assigner.assign(
                         proposal_list[j], gt_bboxes[j], gt_bboxes_ignore[j],
-                        gt_labels[j])
+                        gt_labels[j], gt_texts[j])
                     sampling_result = bbox_sampler.sample(
                         assign_result,
                         proposal_list[j],
                         gt_bboxes[j],
                         gt_labels[j],
+                        gt_texts[j],
                         feats=[lvl_feat[j][None] for lvl_feat in x])
                     sampling_results.append(sampling_result)
 
@@ -215,7 +217,7 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
             cls_score, bbox_pred = bbox_head(bbox_feats)
 
             bbox_targets = bbox_head.get_target(sampling_results, gt_bboxes,
-                                                gt_labels, rcnn_train_cfg)
+                                                gt_labels, gt_texts, rcnn_train_cfg)
             loss_bbox = bbox_head.loss(cls_score, bbox_pred, *bbox_targets)
             for name, value in loss_bbox.items():
                 losses['s{}.{}'.format(i, name)] = (

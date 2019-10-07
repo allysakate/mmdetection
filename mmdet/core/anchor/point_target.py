@@ -11,6 +11,7 @@ def point_target(proposals_list,
                  cfg,
                  gt_bboxes_ignore_list=None,
                  gt_labels_list=None,
+                 gt_texts_list=None,
                  label_channels=1,
                  sampling=True,
                  unmap_outputs=True):
@@ -43,6 +44,8 @@ def point_target(proposals_list,
         gt_bboxes_ignore_list = [None for _ in range(num_imgs)]
     if gt_labels_list is None:
         gt_labels_list = [None for _ in range(num_imgs)]
+    if gt_texts_list is None:
+        gt_texts_list = [None for _ in range(num_imgs)]
     (all_labels, all_label_weights, all_bbox_gt, all_proposals,
      all_proposal_weights, pos_inds_list, neg_inds_list) = multi_apply(
          point_target_single,
@@ -51,6 +54,7 @@ def point_target(proposals_list,
          gt_bboxes_list,
          gt_bboxes_ignore_list,
          gt_labels_list,
+         gt_texts_list,
          cfg=cfg,
          label_channels=label_channels,
          sampling=sampling,
@@ -92,6 +96,7 @@ def point_target_single(flat_proposals,
                         gt_bboxes,
                         gt_bboxes_ignore,
                         gt_labels,
+                        gt_texts,
                         cfg,
                         label_channels=1,
                         sampling=True,
@@ -108,7 +113,7 @@ def point_target_single(flat_proposals,
     else:
         bbox_assigner = build_assigner(cfg.assigner)
         assign_result = bbox_assigner.assign(proposals, gt_bboxes,
-                                             gt_bboxes_ignore, gt_labels)
+                                             gt_bboxes_ignore, gt_labels, gt_texts)
         bbox_sampler = PseudoSampler()
         sampling_result = bbox_sampler.sample(assign_result, proposals,
                                               gt_bboxes)

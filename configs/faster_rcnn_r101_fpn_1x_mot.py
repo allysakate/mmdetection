@@ -28,7 +28,7 @@ model = dict(
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
     bbox_roi_extractor=dict(
         type='SingleRoIExtractor',
-        roi_layer=dict(type='RoIAlign', out_size=7, sample_num=2),
+        roi_layer=dict(type='RoIPool', out_size=7),
         out_channels=256,
         featmap_strides=[4, 8, 16, 32]),
     bbox_head=dict(
@@ -43,7 +43,16 @@ model = dict(
         reg_class_agnostic=False,
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-        loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)))
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
+    recog_head=dict(
+        type='CRNN',
+        roi_layer=dict(type='RoIPool', out_size=[4,20]),
+        feat_strides=[4, 8, 16, 32],
+        abc_len = 37,
+        rnn_hid_size=512,
+        rnn_n_layer=2)
+    )
+
 # model training and testing settings
 train_cfg = dict(
     rpn=dict(
@@ -110,7 +119,7 @@ train_pipeline = [
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='DefaultFormatBundle'),
-    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
+    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_texts']),
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile'),

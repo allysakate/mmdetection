@@ -16,6 +16,7 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
                  backbone,
                  neck=None,
                  shared_head=None,
+                 recog_head=None,
                  rpn_head=None,
                  bbox_roi_extractor=None,
                  bbox_head=None,
@@ -32,6 +33,9 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
 
         if shared_head is not None:
             self.shared_head = builder.build_shared_head(shared_head)
+
+        if recog_head is not None:
+            self.recog_head = builder.build_recog_head(recog_head)
 
         if rpn_head is not None:
             self.rpn_head = builder.build_head(rpn_head)
@@ -76,6 +80,8 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
         if self.with_bbox:
             self.bbox_roi_extractor.init_weights()
             self.bbox_head.init_weights()
+        # if self.with_recog:
+        #     self.recog_head.init_weights()
         if self.with_mask:
             self.mask_head.init_weights()
             if not self.share_roi_extractor:
@@ -105,6 +111,10 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
                 bbox_feats = self.shared_head(bbox_feats)
             cls_score, bbox_pred = self.bbox_head(bbox_feats)
             outs = outs + (cls_score, bbox_pred)
+        
+        if self.with_recog:
+            rois = bbox2roi([proposals])
+            
         # mask head
         if self.with_mask:
             mask_rois = rois[:100]
@@ -121,6 +131,7 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
                       img_meta,
                       gt_bboxes,
                       gt_labels,
+                      gt_texts,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       proposals=None):
@@ -145,7 +156,7 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
             proposal_list = proposals
 
         # assign gts and sample proposals
-        if self.with_bbox or self.with_mask:
+        if self.with_bbox or self.with_mask or self.with_recog:
             bbox_assigner = build_assigner(self.train_cfg.rcnn.assigner)
             bbox_sampler = build_sampler(
                 self.train_cfg.rcnn.sampler, context=self)
@@ -157,12 +168,14 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
                 assign_result = bbox_assigner.assign(proposal_list[i],
                                                      gt_bboxes[i],
                                                      gt_bboxes_ignore[i],
-                                                     gt_labels[i])
+                                                     gt_labels[i],
+                                                     gt_texts[i])
                 sampling_result = bbox_sampler.sample(
                     assign_result,
                     proposal_list[i],
                     gt_bboxes[i],
                     gt_labels[i],
+                    gt_texts[i],
                     feats=[lvl_feat[i][None] for lvl_feat in x])
                 sampling_results.append(sampling_result)
 
@@ -182,6 +195,23 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
             loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
                                             *bbox_targets)
             losses.update(loss_bbox)
+
+        # bbox head forward and loss
+        if self.recog_head:
+            rois = bbox2roi([res.bboxes for res in sampling_results])
+            # TODO: a more flexible way to decide which feature maps to use
+            bbox_feats = self.bbox_roi_extractor(
+                x[:self.bbox_roi_extractor.num_inputs], rois)
+            # if self.with_shared_head:
+            #     bbox_feats = self.shared_head(bbox_feats)
+            seq = self.recog_head(bbox_feats)
+            
+            bbox_targets = self.recog_head.get_target(sampling_results,
+                                                     gt_texts,
+                                                     self.train_cfg.rcnn)
+            loss_bbox = self.recog_head.loss(seq, *bbox_targets)
+            losses.update(loss_bbox)
+
 
         # mask head forward and loss
         if self.with_mask:

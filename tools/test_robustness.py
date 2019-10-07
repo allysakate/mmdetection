@@ -81,6 +81,7 @@ def voc_eval_with_return(result_file,
     det_results = mmcv.load(result_file)
     gt_bboxes = []
     gt_labels = []
+    gt_texts  = []
     gt_ignore = []
     for i in range(len(dataset)):
         ann = dataset.get_ann_info(i)
@@ -96,6 +97,7 @@ def voc_eval_with_return(result_file,
             labels = np.concatenate([labels, ann['labels_ignore']])
         gt_bboxes.append(bboxes)
         gt_labels.append(labels)
+        gt_texts.append(texts)
     if not gt_ignore:
         gt_ignore = gt_ignore
     if hasattr(dataset, 'year') and dataset.year == 2007:
@@ -106,6 +108,7 @@ def voc_eval_with_return(result_file,
         det_results,
         gt_bboxes,
         gt_labels,
+        gt_texts,
         gt_ignore=gt_ignore,
         scale_ranges=None,
         iou_thr=iou_thr,

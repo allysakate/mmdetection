@@ -120,6 +120,7 @@ class FCOSHead(nn.Module):
              centernesses,
              gt_bboxes,
              gt_labels,
+             gt_texts,
              img_metas,
              cfg,
              gt_bboxes_ignore=None):
@@ -128,7 +129,7 @@ class FCOSHead(nn.Module):
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
-                                                gt_labels)
+                                                gt_labels, gt_texts)
 
         num_imgs = cls_scores[0].size(0)
         # flatten cls_scores, bbox_preds and centerness
@@ -298,7 +299,7 @@ class FCOSHead(nn.Module):
             (x.reshape(-1), y.reshape(-1)), dim=-1) + stride // 2
         return points
 
-    def fcos_target(self, points, gt_bboxes_list, gt_labels_list):
+    def fcos_target(self, points, gt_bboxes_list, gt_labels_list, gt_texts_list):
         assert len(points) == len(self.regress_ranges)
         num_levels = len(points)
         # expand regress ranges to align with points
@@ -310,10 +311,11 @@ class FCOSHead(nn.Module):
         concat_regress_ranges = torch.cat(expanded_regress_ranges, dim=0)
         concat_points = torch.cat(points, dim=0)
         # get labels and bbox_targets of each image
-        labels_list, bbox_targets_list = multi_apply(
+        labels_list, bbox_targets_list, texts_list= multi_apply(
             self.fcos_target_single,
             gt_bboxes_list,
             gt_labels_list,
+            gt_texts_list,
             points=concat_points,
             regress_ranges=concat_regress_ranges)
 
@@ -336,12 +338,13 @@ class FCOSHead(nn.Module):
                     [bbox_targets[i] for bbox_targets in bbox_targets_list]))
         return concat_lvl_labels, concat_lvl_bbox_targets
 
-    def fcos_target_single(self, gt_bboxes, gt_labels, points, regress_ranges):
+    def fcos_target_single(self, gt_bboxes, gt_labels, gt_texts, points, regress_ranges):
         num_points = points.size(0)
         num_gts = gt_labels.size(0)
         if num_gts == 0:
             return gt_labels.new_zeros(num_points), \
-                   gt_bboxes.new_zeros((num_points, 4))
+                    gt_texts.new_zeros(num_points), \
+                    gt_bboxes.new_zeros((num_points, 4))
 
         areas = (gt_bboxes[:, 2] - gt_bboxes[:, 0] + 1) * (
             gt_bboxes[:, 3] - gt_bboxes[:, 1] + 1)
@@ -378,9 +381,11 @@ class FCOSHead(nn.Module):
 
         labels = gt_labels[min_area_inds]
         labels[min_area == INF] = 0
+        texts = gt_texts[min_area_inds]
+        texts[min_area == INF] = 0
         bbox_targets = bbox_targets[range(num_points), min_area_inds]
 
-        return labels, bbox_targets
+        return labels, bbox_targets, texts
 
     def centerness_target(self, pos_bbox_targets):
         # only calculate pos centerness targets, otherwise there may be nan

@@ -110,6 +110,7 @@ class GridRCNN(TwoStageDetector):
                       img_meta,
                       gt_bboxes,
                       gt_labels,
+                      gt_texts,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       proposals=None):
@@ -146,12 +147,14 @@ class GridRCNN(TwoStageDetector):
                 assign_result = bbox_assigner.assign(proposal_list[i],
                                                      gt_bboxes[i],
                                                      gt_bboxes_ignore[i],
-                                                     gt_labels[i])
+                                                     gt_labels[i],
+                                                     gt_texts[i])
                 sampling_result = bbox_sampler.sample(
                     assign_result,
                     proposal_list[i],
                     gt_bboxes[i],
                     gt_labels[i],
+                    gt_texts[i],
                     feats=[lvl_feat[i][None] for lvl_feat in x])
                 sampling_results.append(sampling_result)
 
@@ -165,7 +168,7 @@ class GridRCNN(TwoStageDetector):
             cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
             bbox_targets = self.bbox_head.get_target(sampling_results,
-                                                     gt_bboxes, gt_labels,
+                                                     gt_bboxes, gt_labels, gt_texts,
                                                      self.train_cfg.rcnn)
             loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
                                             *bbox_targets)

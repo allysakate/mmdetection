@@ -46,6 +46,7 @@ class HybridTaskCascade(CascadeRCNN):
                             sampling_results,
                             gt_bboxes,
                             gt_labels,
+                            gt_texts,
                             rcnn_train_cfg,
                             semantic_feat=None):
         rois = bbox2roi([res.bboxes for res in sampling_results])
@@ -66,7 +67,7 @@ class HybridTaskCascade(CascadeRCNN):
         cls_score, bbox_pred = bbox_head(bbox_feats)
 
         bbox_targets = bbox_head.get_target(sampling_results, gt_bboxes,
-                                            gt_labels, rcnn_train_cfg)
+                                            gt_labels, gt_texts, rcnn_train_cfg)
         loss_bbox = bbox_head.loss(cls_score, bbox_pred, *bbox_targets)
         return loss_bbox, rois, bbox_targets, bbox_pred
 
@@ -199,6 +200,7 @@ class HybridTaskCascade(CascadeRCNN):
                       img_meta,
                       gt_bboxes,
                       gt_labels,
+                      gt_texts,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       gt_semantic_seg=None,
@@ -249,19 +251,21 @@ class HybridTaskCascade(CascadeRCNN):
                 assign_result = bbox_assigner.assign(proposal_list[j],
                                                      gt_bboxes[j],
                                                      gt_bboxes_ignore[j],
-                                                     gt_labels[j])
+                                                     gt_labels[j],
+                                                     gt_texts[j])
                 sampling_result = bbox_sampler.sample(
                     assign_result,
                     proposal_list[j],
                     gt_bboxes[j],
                     gt_labels[j],
+                    gt_texts[j],
                     feats=[lvl_feat[j][None] for lvl_feat in x])
                 sampling_results.append(sampling_result)
 
             # bbox head forward and loss
             loss_bbox, rois, bbox_targets, bbox_pred = \
                 self._bbox_forward_train(
-                    i, x, sampling_results, gt_bboxes, gt_labels,
+                    i, x, sampling_results, gt_bboxes, gt_labels, gt_texts,
                     rcnn_train_cfg, semantic_feat)
             roi_labels = bbox_targets[0]
 
@@ -283,12 +287,13 @@ class HybridTaskCascade(CascadeRCNN):
                         for j in range(num_imgs):
                             assign_result = bbox_assigner.assign(
                                 proposal_list[j], gt_bboxes[j],
-                                gt_bboxes_ignore[j], gt_labels[j])
+                                gt_bboxes_ignore[j], gt_labels[j],gt_texts[j])
                             sampling_result = bbox_sampler.sample(
                                 assign_result,
                                 proposal_list[j],
                                 gt_bboxes[j],
                                 gt_labels[j],
+                                gt_texts[j],
                                 feats=[lvl_feat[j][None] for lvl_feat in x])
                             sampling_results.append(sampling_result)
                 loss_mask = self._mask_forward_train(i, x, sampling_results,

@@ -13,6 +13,7 @@ class FastRCNN(TwoStageDetector):
                  test_cfg,
                  neck=None,
                  shared_head=None,
+                 recog_head=None,
                  mask_roi_extractor=None,
                  mask_head=None,
                  pretrained=None):
@@ -20,6 +21,7 @@ class FastRCNN(TwoStageDetector):
             backbone=backbone,
             neck=neck,
             shared_head=shared_head,
+            recog_head = recog_head,
             bbox_roi_extractor=bbox_roi_extractor,
             bbox_head=bbox_head,
             train_cfg=train_cfg,
