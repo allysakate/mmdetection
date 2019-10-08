@@ -190,7 +190,7 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
             cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
             bbox_targets = self.bbox_head.get_target(sampling_results,
-                                                     gt_bboxes, gt_labels,
+                                                     gt_bboxes, gt_labels,gt_texts,
                                                      self.train_cfg.rcnn)
             loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
                                             *bbox_targets)
@@ -204,7 +204,7 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
                 x[:self.bbox_roi_extractor.num_inputs], rois)
             # if self.with_shared_head:
             #     bbox_feats = self.shared_head(bbox_feats)
-            seq = self.recog_head(bbox_feats)
+            seq = self.recog_head(x,rois)
             
             bbox_targets = self.recog_head.get_target(sampling_results,
                                                      gt_texts,

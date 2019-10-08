@@ -49,7 +49,7 @@ model = dict(
         roi_layer=dict(type='RoIPool', out_size=[4,20]),
         feat_strides=[4, 8, 16, 32],
         abc_len = 37,
-        rnn_hid_size=512,
+        rnn_hid_size=256,
         rnn_n_layer=2)
     )
 

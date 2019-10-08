@@ -46,6 +46,7 @@ class RPNHead(AnchorHead):
             bbox_preds,
             gt_bboxes,
             None,
+            None,
             img_metas,
             cfg,
             gt_bboxes_ignore=gt_bboxes_ignore)
