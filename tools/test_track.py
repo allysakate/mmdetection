@@ -1,9 +1,12 @@
-#Usage: python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/fast_rcnn_r101_fpn_1x_20181129-ffaa2eb0.pth  --out results.pkl
-import argparse
+'''
+Usage:
+python tools/test_track.py configs/faster_rcnn_r101_fpn_1x_mot.py results/faster_crnn_r101_fpn_1x_mot_1003-c1ba652c.pth  --out results.pklimport argparse
+'''
 import os
 import os.path as osp
 import shutil
 import tempfile
+import argparse
 
 import mmcv
 import torch
@@ -18,6 +21,7 @@ from mmdet.models import build_detector
 from tools.voc_eval import voc_eval
 from mmdet.models.tracktor import resnet50
 from mmdet.models.tracktor import Tracker
+from mmdet.models.tracktor import plot_sequence
 
 def single_gpu_test(model,data_loader,show=False, 
                     tracktor_cfg=None,nms_cfg=None):
@@ -37,10 +41,8 @@ def single_gpu_test(model,data_loader,show=False,
         tracker.step(data)
         prog_bar.update()
     results = tracker.get_results()
-    print("[*] Tracks found: {}".format(len(results)))
-
-    return results
-
+    if tracktor_cfg.write_images:
+        plot_sequence(results, data_loader, osp.join(tracktor_cfg.output_dir))
 
 def multi_gpu_test(model, data_loader, tmpdir=None, 
                     tracktor_cfg=None,nms_cfg=None):
@@ -195,14 +197,6 @@ def main():
         model = MMDistributedDataParallel(model.cuda())
         outputs = multi_gpu_test(model, data_loader, args.tmpdir,
                     tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
-
-    # rank, _ = get_dist_info()
-    # if args.out and rank == 0:
-    #     print('\nwriting results to {}'.format(args.out))
-    #     mmcv.dump(outputs, args.out)
-    #     print('Starting evaluate using voc_eval')
-    #     voc_eval(args.out,dataset)
-
 
 if __name__ == '__main__':
     main()

@@ -43,15 +43,8 @@ model = dict(
         reg_class_agnostic=False,
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-        loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
-    recog_head=dict(
-        type='CRNN',
-        roi_layer=dict(type='RoIPool', out_size=[4,20]),
-        feat_strides=[4, 8, 16, 32],
-        abc_len = 37,
-        rnn_hid_size=256,
-        rnn_n_layer=2)
-    )
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
+)
 
 # model training and testing settings
 train_cfg = dict(
@@ -186,8 +179,8 @@ tracktor = dict(
     reid_weights='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/ResNet_iter_25245.pth',
     reid_config='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/sacred_config.yaml',
     interpolate=False,
-    write_images=False ,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
-    frame_split=[0.0, 1.0],  # [start percentage, end percentage], e.g., [0.0, 0.5] for train and [0.75, 1.0] for val split.
+    write_images=True,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
+    output_dir='output/test_images/',
     tracker=dict(        
         detection_thresh=0.005,
         regression_thresh=0.005,          #score threshold for keeping the track alive

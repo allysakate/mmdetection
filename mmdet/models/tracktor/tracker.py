@@ -372,21 +372,13 @@ class Tracker():
 				nms_inp_reg = torch.cat((self.get_pos(), regress_scores.add_(3).view(-1, 1)), 1)
 				nms_type = self.nms_cfg.pop('type', 'nms')
 				nms_op = getattr(nms_wrapper, nms_type)
-				nms_inp_reg_keep = nms_op(nms_inp_reg, self.regression_nms_thresh)
+				keep = nms_op(nms_inp_reg, self.regression_nms_thresh)
 
-				
-	#			print(f'nms_inp_reg_keep: {nms_inp_reg_keep}')
-				for i in list(range(len(nms_inp_reg_keep))):
-	#				print(f'nms {nms_inp_reg_keepd[i]}')
-				
-				for i in list(range(len(self.tracks))):
-	#				print(f'tracks {self.tracks[i]}') 
-				
 				self.tracks_to_inactive([self.tracks[i]
 				                         for i in list(range(len(self.tracks)))
-				                         if self.tracks[i] not in nms_inp_reg_keep[0]])
+				                         if i not in keep[1]])
 
-				if len(nms_inp_reg_keep) > 0:
+				if keep[1].nelement() > 0:
 					nms_inp_reg = torch.cat((self.get_pos(), torch.ones(self.get_pos().size(0)).add_(3).view(-1,1).cuda()),1)
 					new_features = self.get_appearances(blob)
 
@@ -412,21 +404,22 @@ class Tracker():
 		if nms_inp_det.nelement() > 0:
 			nms_type = self.nms_cfg.pop('type', 'nms')
 			nms_op = getattr(nms_wrapper, nms_type)
-			nms_inp_det_keep = nms_op(nms_inp_det, self.detection_nms_thresh)
-			nms_inp_det = nms_inp_det_keep
+			keep = nms_op(nms_inp_det, self.detection_nms_thresh)[1]
+			nms_inp_det = nms_inp_det[keep]
+
 			# check with every track in a single run (problem if tracks delete each other)
 			for i in range(num_tracks):
 				nms_inp = torch.cat((nms_inp_reg[i].view(1,-1), nms_inp_det), 0)
-				nms_inp_keep = nms_op(nms_inp, self.detection_nms_thresh)
-				if len(nms_inp_keep) == 0:
+				keep = nms_op(nms_inp, self.detection_nms_thresh)[1]
+				keep = keep[torch.ge(keep,1)]
+				if keep.nelement() == 0:
 					nms_inp_det = nms_inp_det.new(0)
 					break
-				nms_inp_det = nms_inp_keep
+				nms_inp_det = nms_inp[keep]
 		
 		if len(nms_inp_det) > 0:
-			new_det_pos    = nms_inp_det[0][:,:4]
-			new_det_scores = nms_inp_det[0][:, 4]
-			new_det_inds   = nms_inp_det[1]
+			new_det_pos    = nms_inp_det[:,:4]
+			new_det_scores = nms_inp_det[:, 4]
 	#		print(f'Inp_det: {nms_inp_det} | {new_det_pos} | {new_det_scores} | {new_det_inds}')
 
 			# try to redientify tracks
