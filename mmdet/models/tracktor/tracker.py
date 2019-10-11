@@ -72,7 +72,7 @@ class Tracker():
 		pos = self.get_pos()
 	#	print(f'regress_pos {pos}')
 		# regress
-		scores, bbox_pred, rois = self.obj_detect(proposals=pos,return_loss=False, **blob)
+		scores, bbox_pred, rois = self.obj_detect(proposals=pos,return_loss=False, track=True, **blob)
 		boxes = bbox_transform_inv(rois, bbox_pred)
 		img_meta = blob['img_meta'][0].data[0]
 		boxes = clip_boxes(Variable(boxes),img_meta[0]['img_shape'][:2]).data
@@ -319,7 +319,7 @@ class Tracker():
 		# Look for new detections #
 		###########################
 		with torch.no_grad():
-			scores, bbox_pred, rois = self.obj_detect(return_loss=False, **blob)
+			scores, bbox_pred, rois = self.obj_detect(return_loss=False, track=True, **blob)
 
 		if rois.nelement() > 0:
 			boxes = bbox_transform_inv(rois, bbox_pred)
@@ -373,14 +373,6 @@ class Tracker():
 				nms_type = self.nms_cfg.pop('type', 'nms')
 				nms_op = getattr(nms_wrapper, nms_type)
 				nms_inp_reg_keep = nms_op(nms_inp_reg, self.regression_nms_thresh)
-
-				
-	#			print(f'nms_inp_reg_keep: {nms_inp_reg_keep}')
-				for i in list(range(len(nms_inp_reg_keep))):
-	#				print(f'nms {nms_inp_reg_keepd[i]}')
-				
-				for i in list(range(len(self.tracks))):
-	#				print(f'tracks {self.tracks[i]}') 
 				
 				self.tracks_to_inactive([self.tracks[i]
 				                         for i in list(range(len(self.tracks)))

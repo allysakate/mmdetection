@@ -1,4 +1,7 @@
-#Usage: python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/fast_rcnn_r101_fpn_1x_20181129-ffaa2eb0.pth  --out results.pkl
+'''
+Usage:
+python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py publish/faster_crnn_r101_fpn_1x_mot_101019-9f4dc6f5.pth 
+'''
 import argparse
 import os
 import os.path as osp
@@ -16,26 +19,16 @@ from mmdet.core import coco_eval, results2json, wrap_fp16_model
 from mmdet.datasets import build_dataloader, build_dataset
 from mmdet.models import build_detector
 from tools.voc_eval import voc_eval
-from mmdet.models.tracktor import resnet50
-from mmdet.models.tracktor import Tracker
 
-def single_gpu_test(model,data_loader,show=False, 
-                    tracktor_cfg=None,nms_cfg=None):
+
+def single_gpu_test(model, data_loader, show=False):
     model.eval()
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
-
-    reid_network = resnet50(pretrained=False, output_dim=128)
-    reid_network.load_state_dict(torch.load(tracktor_cfg.reid_weights))
-    reid_network.eval()
-    reid_network.cuda()
-
-    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, nms_cfg)
-
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=not show, **data)
+            result = model(return_loss=False, rescale=not show, track=False, **data)
         results.append(result)
 
         if show:
@@ -44,12 +37,10 @@ def single_gpu_test(model,data_loader,show=False,
         batch_size = data['img'][0].size(0)
         for _ in range(batch_size):
             prog_bar.update()
-    print(results)
     return results
 
 
-def multi_gpu_test(model, data_loader, tmpdir=None, 
-                    tracktor_cfg=None,nms_cfg=None):
+def multi_gpu_test(model, data_loader, tmpdir=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -195,19 +186,48 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
-        outputs = single_gpu_test(model, data_loader, args.show, 
-                    tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
+        outputs = single_gpu_test(model, data_loader, args.show)
     else:
         model = MMDistributedDataParallel(model.cuda())
-        outputs = multi_gpu_test(model, data_loader, args.tmpdir,
-                    tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
+        outputs = multi_gpu_test(model, data_loader, args.tmpdir)
 
     rank, _ = get_dist_info()
     if args.out and rank == 0:
         print('\nwriting results to {}'.format(args.out))
         mmcv.dump(outputs, args.out)
-        print('Starting evaluate using voc_eval')
-        voc_eval(args.out,dataset)
+        eval_types = args.eval
+        if eval_types:
+            print('Starting evaluate {}'.format(' and '.join(eval_types)))
+            if eval_types == ['proposal_fast']:
+                result_file = args.out
+                coco_eval(result_file, eval_types, dataset.coco)
+            else:
+                if not isinstance(outputs[0], dict):
+                    result_files = results2json(dataset, outputs, args.out)
+                    coco_eval(result_files, eval_types, dataset)
+                else:
+                    for name in outputs[0]:
+                        print('\nEvaluating {}'.format(name))
+                        outputs_ = [out[name] for out in outputs]
+                        result_file = args.out + '.{}'.format(name)
+                        result_files = results2json(dataset, outputs_,
+                                                    result_file)
+                        coco_eval(result_files, eval_types, dataset.coco)
+        else:
+            print('\nwriting results to {}'.format(args.out))
+            mmcv.dump(outputs, args.out)
+            print('Starting evaluate using voc_eval')
+            voc_eval(args.out,dataset)
+
+    # Save predictions in the COCO json format
+    if args.json_out and rank == 0:
+        if not isinstance(outputs[0], dict):
+            results2json(dataset, outputs, args.json_out)
+        else:
+            for name in outputs[0]:
+                outputs_ = [out[name] for out in outputs]
+                result_file = args.json_out + '.{}'.format(name)
+                results2json(dataset, outputs_, result_file)
 
 
 if __name__ == '__main__':
