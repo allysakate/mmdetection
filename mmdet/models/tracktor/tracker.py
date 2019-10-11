@@ -72,7 +72,7 @@ class Tracker():
 		pos = self.get_pos()
 	#	print(f'regress_pos {pos}')
 		# regress
-		scores, bbox_pred, rois = self.obj_detect(proposals=pos,return_loss=False, track=True, **blob)
+		scores, bbox_pred, rois = self.obj_detect(proposals=pos, return_loss=False, track=True, **blob)
 		boxes = bbox_transform_inv(rois, bbox_pred)
 		img_meta = blob['img_meta'][0].data[0]
 		boxes = clip_boxes(Variable(boxes),img_meta[0]['img_shape'][:2]).data
@@ -352,11 +352,9 @@ class Tracker():
 	#		print(f'len_tracks {len(self.tracks)}')
 			# align
 			if self.do_align:
-				print('do_align')
 				self.align(blob)
 			# apply motion model
 			if self.motion_model:
-				print('motion model')
 				self.motion()
 			#regress
 			regress_scores = self.regress_tracks(blob)
