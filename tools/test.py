@@ -1,10 +1,7 @@
-<<<<<<< HEAD
 '''
 Usage:
 python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py publish/faster_crnn_r101_fpn_1x_mot_101019-9f4dc6f5.pth 
 '''
-=======
->>>>>>> d1c67c87c6dce542dbfae60a7261d73f92bf4abd
 import argparse
 import os
 import os.path as osp
