@@ -177,8 +177,9 @@ tracktor = dict(
     reid_weights='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/ResNet_iter_25245.pth',
     reid_config='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/sacred_config.yaml',
     interpolate=False,
-    write_images=False ,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
+    write_images=True ,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
     frame_split=[0.0, 1.0],  # [start percentage, end percentage], e.g., [0.0, 0.5] for train and [0.75, 1.0] for val split.
+    output_dir = 'results/tracker',
     tracker=dict(        
         detection_thresh=0.005,
         regression_thresh=0.005,          #score threshold for keeping the track alive

@@ -1,9 +1,12 @@
-#Usage: python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/fast_rcnn_r101_fpn_1x_20181129-ffaa2eb0.pth  --out results.pkl
-import argparse
+'''
+Usage:
+python tools/test_track.py configs/faster_rcnn_r101_fpn_1x_mot.py results/faster_crnn_r101_fpn_1x_mot_101019-9f4dc6f5.pth  --out results.pkl
+'''
 import os
 import os.path as osp
 import shutil
 import tempfile
+import argparse
 
 import mmcv
 import torch
@@ -18,6 +21,7 @@ from mmdet.models import build_detector
 from tools.voc_eval import voc_eval
 from mmdet.models.tracktor import resnet50
 from mmdet.models.tracktor import Tracker
+from mmdet.models.tracktor import plot_sequence
 
 def single_gpu_test(model,data_loader,show=False, 
                     tracktor_cfg=None,nms_cfg=None):
@@ -37,10 +41,8 @@ def single_gpu_test(model,data_loader,show=False,
         tracker.step(data)
         prog_bar.update()
     results = tracker.get_results()
-    print("[*] Tracks found: {}".format(len(results)))
-
-    return results
-
+    if tracktor_cfg.write_images:
+        plot_sequence(results, data_loader, osp.join(tracktor_cfg.output_dir))
 
 def multi_gpu_test(model, data_loader, tmpdir=None, 
                     tracktor_cfg=None,nms_cfg=None):
@@ -50,18 +52,19 @@ def multi_gpu_test(model, data_loader, tmpdir=None,
     rank, world_size = get_dist_info()
     if rank == 0:
         prog_bar = mmcv.ProgressBar(len(dataset))
+
+    reid_network = resnet50(pretrained=False, output_dim=128)
+    reid_network.load_state_dict(torch.load(tracktor_cfg.reid_weights))
+    reid_network.eval()
+    reid_network.cuda()
+
+    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, nms_cfg)
+
     for i, data in enumerate(data_loader):
-        with torch.no_grad():
-            result = model(return_loss=False, rescale=True, **data)
-        results.append(result)
-
+        tracker.step(data)
         if rank == 0:
-            batch_size = data['img'][0].size(0)
-            for _ in range(batch_size * world_size):
-                prog_bar.update()
-
-    # collect results from all ranks
-    results = collect_results(results, len(dataset), tmpdir)
+            prog_bar.update()
+    results = tracker.get_results()
 
     return results
 
@@ -195,14 +198,6 @@ def main():
         model = MMDistributedDataParallel(model.cuda())
         outputs = multi_gpu_test(model, data_loader, args.tmpdir,
                     tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
-
-    # rank, _ = get_dist_info()
-    # if args.out and rank == 0:
-    #     print('\nwriting results to {}'.format(args.out))
-    #     mmcv.dump(outputs, args.out)
-    #     print('Starting evaluate using voc_eval')
-    #     voc_eval(args.out,dataset)
-
 
 if __name__ == '__main__':
     main()

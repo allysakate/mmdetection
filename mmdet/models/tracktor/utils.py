@@ -103,7 +103,8 @@ def plot_sequence(tracks, db, output_dir):
 	styles = defaultdict(lambda : next(loop_cy_iter))
 
 	for i,v in enumerate(db):
-		im_path = v['im_path']
+		img_meta = v['img_meta'][0].data[0]
+		im_path = img_meta[0]['filename']
 		im_name = osp.basename(im_path)
 		im_output = osp.join(output_dir, im_name)
 		im = cv2.imread(im_path)
@@ -128,10 +129,10 @@ def plot_sequence(tracks, db, output_dir):
 							t_i[2] - t_i[0],
 							t_i[3] - t_i[1],
 							fill=False,
-							linewidth=1.0, **styles[j]))
+							linewidth=5.0, **styles[j]))
 
 				ax.annotate(j, (t_i[0] + (t_i[2] - t_i[0]) / 2.0, t_i[1] + (t_i[3] - t_i[1]) / 2.0),
-				            color=styles[j]['ec'], weight='bold', fontsize=6, ha='center', va='center')
+				            color=styles[j]['ec'], weight='bold', fontsize=20, ha='center', va='center')
 
 		plt.axis('off')
 		# plt.tight_layout()
