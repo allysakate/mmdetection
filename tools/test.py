@@ -1,3 +1,8 @@
+'''
+Usage:
+python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth  --out results_detect.pkl
+'''
+
 import argparse
 import os
 import os.path as osp
@@ -24,8 +29,7 @@ def single_gpu_test(model, data_loader, show=False):
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=not show, **data)
-            print(result)
+            result = model(return_loss=False, rescale=not show, track=False, regress=False, **data)
         results.append(result)
 
         if show:

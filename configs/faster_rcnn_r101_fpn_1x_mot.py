@@ -90,16 +90,21 @@ test_cfg = dict(
         nms_pre=1000,
         nms_post=1000,
         max_num=1000,
-        nms_thr=0.7,
+        nms_thr=0.7, 
         min_bbox_size=0),
     rcnn=dict(
-        score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=100)
+        score_thr=0.3, nms=dict(type='nms', iou_thr=0.5), max_per_img=20),
+    track=dict(
+        score_thr=0.5, nms=dict(type='nms', iou_thr=0.3), max_per_img=20),
+    regress=dict(
+        score_thr=0.5, nms=dict(type='nms', iou_thr=0.6), max_per_img=20),
+    # mmdet/core/post_processing/bbox_nms.py
     # soft-nms is also supported for rcnn testing
     # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
 )
 # dataset settings
 dataset_type = 'MOTDataset'
-data_root = 'data/CVAT/'
+data_root = 'data/CVAT_track/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -181,10 +186,10 @@ tracktor = dict(
     frame_split=[0.0, 1.0],  # [start percentage, end percentage], e.g., [0.0, 0.5] for train and [0.75, 1.0] for val split.
     output_dir = 'results/tracker',
     tracker=dict(        
-        detection_thresh=0.005,
-        regression_thresh=0.005,          #score threshold for keeping the track alive
-        detection_nms_thresh=0.003,        #NMS threshold for detection
-        regression_nms_thresh=0.003,       # NMS theshold while tracking
+        detection_thresh=0.5,
+        regression_thresh=0.5,           #score threshold for keeping the track alive
+        detection_nms_thresh=0.3,        #NMS threshold for detection
+        regression_nms_thresh=0.3,       # NMS theshold while tracking
         motion_model=False,              # use a constant velocity assumption v_t = x_t - x_t-1
         # DPM or DPM_RAW or 0, raw includes the unfiltered (no nms) versions of the provided detections,
         public_detections=True,          # 0 tells the tracker to use private detections (Faster R-CNN)

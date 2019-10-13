@@ -1,6 +1,6 @@
 '''
 Usage:
-python tools/test_track.py configs/faster_rcnn_r101_fpn_1x_mot.py results/faster_crnn_r101_fpn_1x_mot_101019-9f4dc6f5.pth  --out results.pkl
+python tools/test_track.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth  --out results.pkl
 '''
 import os
 import os.path as osp

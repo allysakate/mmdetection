@@ -137,7 +137,8 @@ class BBoxHead(nn.Module):
                        img_shape,
                        scale_factor,
                        rescale=False,
-                       cfg=None):
+                       cfg=None,
+                       regress=False):
         if isinstance(cls_score, list):
             cls_score = sum(cls_score) / float(len(cls_score))
         scores = F.softmax(cls_score, dim=1) if cls_score is not None else None
@@ -156,6 +157,8 @@ class BBoxHead(nn.Module):
                 bboxes /= scale_factor
             else:
                 bboxes /= torch.from_numpy(scale_factor).to(bboxes.device)
+        if regress:
+            return bboxes, scores
 
         if cfg is None:
             return bboxes, scores
