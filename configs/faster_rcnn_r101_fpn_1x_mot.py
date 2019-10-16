@@ -138,7 +138,7 @@ data = dict(
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'train/train.pkl',
-        img_prefix=data_root + 'train/images/',
+        img_prefix=data_root + 'train/image/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
@@ -170,7 +170,7 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-total_epochs = 12
+total_epochs = 50
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/faster_rcnn_r101_fpn_1x'
@@ -183,7 +183,6 @@ tracktor = dict(
     reid_config='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/sacred_config.yaml',
     interpolate=False,
     write_images=True ,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
-    frame_split=[0.0, 1.0],  # [start percentage, end percentage], e.g., [0.0, 0.5] for train and [0.75, 1.0] for val split.
     output_dir = 'results/tracker',
     tracker=dict(        
         detection_thresh=0.5,

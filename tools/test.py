@@ -1,6 +1,6 @@
 '''
 Usage:
-python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth  --out results_detect.pkl
+python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth  --out results/results_detect.pkl
 '''
 
 import argparse
