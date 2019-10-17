@@ -20,6 +20,7 @@ from mmdet.core import coco_eval, results2json, wrap_fp16_model
 from mmdet.datasets import build_dataloader, build_dataset
 from mmdet.models import build_detector
 from tools.voc_eval import voc_eval
+from tools.exec_time import Timer
 
 
 def single_gpu_test(model, data_loader, show=False):
@@ -232,4 +233,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    with Timer('Time of Detection Test'):
+        main()

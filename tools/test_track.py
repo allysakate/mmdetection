@@ -23,6 +23,7 @@ from tools.voc_eval import voc_eval
 from mmdet.models.tracktor import resnet50
 from mmdet.models.tracktor import Tracker
 from mmdet.models.tracktor import plot_sequence
+from tools.exec_time import Timer
 
 def single_gpu_test(model,data_loader,show=False, 
                     tracktor_cfg=None,nms_cfg=None):
@@ -202,4 +203,5 @@ def main():
 
     print(time.time()-start_time)
 if __name__ == '__main__':
-    main()
+    with Timer("Time for Tracking"):
+        main()
