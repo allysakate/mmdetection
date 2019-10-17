@@ -129,10 +129,10 @@ def plot_sequence(tracks, db, output_dir):
 							t_i[2] - t_i[0],
 							t_i[3] - t_i[1],
 							fill=False,
-							linewidth=5.0, **styles[j]))
-
-				ax.annotate(j, (t_i[0] + (t_i[2] - t_i[0]) / 2.0, t_i[1] + (t_i[3] - t_i[1]) / 2.0),
-				            color=styles[j]['ec'], weight='bold', fontsize=20, ha='center', va='center')
+							linewidth=4.0, **styles[j]))
+				text = f'{j}_{t_i[5]}'
+				ax.annotate(text, (t_i[0] + (t_i[2] - t_i[0]) / 2.0, t_i[1] + (t_i[3] - t_i[1]) / 2.0),
+				            color=styles[j]['ec'], weight='bold', fontsize=15, ha='center', va='center')
 
 		plt.axis('off')
 		# plt.tight_layout()

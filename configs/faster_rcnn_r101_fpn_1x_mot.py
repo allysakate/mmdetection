@@ -92,16 +92,21 @@ test_cfg = dict(
         nms_pre=1000,
         nms_post=1000,
         max_num=1000,
-        nms_thr=0.7,
+        nms_thr=0.7, 
         min_bbox_size=0),
     rcnn=dict(
-        score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=100)
+        score_thr=0.3, nms=dict(type='nms', iou_thr=0.5), max_per_img=20),
+    track=dict(
+        score_thr=0.5, nms=dict(type='nms', iou_thr=0.3), max_per_img=20),
+    regress=dict(
+        score_thr=0.5, nms=dict(type='nms', iou_thr=0.6), max_per_img=20),
+    # mmdet/core/post_processing/bbox_nms.py
     # soft-nms is also supported for rcnn testing
     # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
 )
 # dataset settings
 dataset_type = 'MOTDataset'
-data_root = 'data/CVAT/'
+data_root = 'data/CVAT_track/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -135,7 +140,7 @@ data = dict(
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'train/train.pkl',
-        img_prefix=data_root + 'train/images/',
+        img_prefix=data_root + 'train/image/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
@@ -167,7 +172,7 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-total_epochs = 12
+total_epochs = 50
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/faster_rcnn_r101_fpn_1x'
@@ -179,13 +184,13 @@ tracktor = dict(
     reid_weights='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/ResNet_iter_25245.pth',
     reid_config='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/sacred_config.yaml',
     interpolate=False,
-    write_images=True,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
-    output_dir='output/test_images/',
+    write_images=True ,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
+    output_dir = 'results/tracker',
     tracker=dict(        
-        detection_thresh=0.005,
-        regression_thresh=0.005,          #score threshold for keeping the track alive
-        detection_nms_thresh=0.003,        #NMS threshold for detection
-        regression_nms_thresh=0.003,       # NMS theshold while tracking
+        detection_thresh=0.5,
+        regression_thresh=0.5,           #score threshold for keeping the track alive
+        detection_nms_thresh=0.3,        #NMS threshold for detection
+        regression_nms_thresh=0.3,       # NMS theshold while tracking
         motion_model=False,              # use a constant velocity assumption v_t = x_t - x_t-1
         # DPM or DPM_RAW or 0, raw includes the unfiltered (no nms) versions of the provided detections,
         public_detections=True,          # 0 tells the tracker to use private detections (Faster R-CNN)

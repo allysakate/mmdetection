@@ -1,7 +1,8 @@
 '''
 Usage:
-python tools/test_track.py configs/faster_rcnn_r101_fpn_1x_mot.py results/faster_crnn_r101_fpn_1x_mot_1003-c1ba652c.pth  --out results.pklimport argparse
+python tools/test_track.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth  --out results/results_track.pkl
 '''
+import time
 import os
 import os.path as osp
 import shutil
@@ -142,7 +143,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-
+    start_time = time.time()
     assert args.out or args.show or args.json_out, \
         ('Please specify at least one operation (save or show the results) '
          'with the argument "--out" or "--show" or "--json_out"')
@@ -199,5 +200,6 @@ def main():
         outputs = multi_gpu_test(model, data_loader, args.tmpdir,
                     tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
 
+    print(time.time()-start_time)
 if __name__ == '__main__':
     main()

@@ -251,27 +251,33 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
 
         return losses
 
-    def simple_test(self, img, img_meta, proposals=None, rescale=False):
+    def simple_test(self, img, img_meta, proposals=None, rescale=False, track=False, regress=False):
         """Test without augmentation."""
         assert self.with_bbox, "Bbox head must be implemented."
-        track = True
 
         x = self.extract_feat(img)
-        proposal_list = self.simple_test_rpn(
-            x, img_meta, self.test_cfg.rpn) if proposals is None else proposals
 
-        if track:
-            cls_score, bbox_pred, rois = self.simple_track_bboxes(
-                x, img_meta, proposal_list, self.test_cfg.rcnn, rescale=rescale)
+        if track == False and regress == False:
+            nms_cfg = self.test_cfg.rcnn
+        elif track == True and regress == False:
+            nms_cfg = self.test_cfg.track
+        elif track == True and regress == True:
+            nms_cfg = self.test_cfg.regress
+
+        if proposals is None:
+            proposal_list = self.simple_test_rpn(x, img_meta, self.test_cfg.rpn)
         else:
-            det_bboxes, det_labels = self.simple_test_bboxes(
-                x, img_meta, proposal_list, self.test_cfg.rcnn, rescale=rescale)
-            bbox_results = bbox2result(det_bboxes, det_labels,
-                                       self.bbox_head.num_classes)
+            proposal_list = proposals
+
+        det_bboxes, det_labels = self.simple_test_bboxes(
+                x, img_meta, proposal_list, nms_cfg, rescale=rescale, regress=regress)
+        
         if not self.with_mask:
             if track:
-                return cls_score, bbox_pred, rois
+                return det_bboxes, det_labels
             else:
+                bbox_results = bbox2result(det_bboxes, det_labels,
+                                    self.bbox_head.num_classes)
                 return bbox_results
         else:
             segm_results = self.simple_test_mask(
