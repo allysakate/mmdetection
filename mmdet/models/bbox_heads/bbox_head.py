@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn import CTCLoss
 import torch.nn.functional as F
 from torch.nn.modules.utils import _pair
 
@@ -44,6 +45,8 @@ class BBoxHead(nn.Module):
         self.target_stds = target_stds
         self.reg_class_agnostic = reg_class_agnostic
         self.fp16_enabled = False
+        self.ctc_loss = CTCLoss(zero_infinity=True)
+
 
         self.loss_cls = build_loss(loss_cls)
         self.loss_bbox = build_loss(loss_bbox)
@@ -77,32 +80,35 @@ class BBoxHead(nn.Module):
         bbox_pred = self.fc_reg(x) if self.with_reg else None
         return cls_score, bbox_pred
 
-    def get_target(self, sampling_results, gt_bboxes, gt_labels, gt_texts,
-                   rcnn_train_cfg):
+    def get_target(self, sampling_results, gt_bboxes, gt_labels, gt_texts, rcnn_train_cfg):
         pos_proposals = [res.pos_bboxes for res in sampling_results]
         neg_proposals = [res.neg_bboxes for res in sampling_results]
         pos_gt_bboxes = [res.pos_gt_bboxes for res in sampling_results]
         pos_gt_labels = [res.pos_gt_labels for res in sampling_results]
+        pos_gt_texts  = [res.pos_gt_texts for res in sampling_results]
         reg_classes = 1 if self.reg_class_agnostic else self.num_classes
         cls_reg_targets = bbox_target(
             pos_proposals,
             neg_proposals,
             pos_gt_bboxes,
             pos_gt_labels,
+            pos_gt_texts,
             rcnn_train_cfg,
             reg_classes,
             target_means=self.target_means,
             target_stds=self.target_stds)
         return cls_reg_targets
 
-    @force_fp32(apply_to=('cls_score', 'bbox_pred'))
+    @force_fp32(apply_to=('cls_score', 'bbox_pred', 'seq'))
     def loss(self,
              cls_score,
              bbox_pred,
+             seq,
              labels,
              label_weights,
              bbox_targets,
              bbox_weights,
+             texts,
              reduction_override=None):
         losses = dict()
         if cls_score is not None:
@@ -127,6 +133,13 @@ class BBoxHead(nn.Module):
                 bbox_weights[pos_inds],
                 avg_factor=bbox_targets.size(0),
                 reduction_override=reduction_override)
+        if seq is not None:
+            texts_len = torch.tensor([t.nonzero().size(0) for t in texts], dtype=torch.long)
+            seq_len = torch.full(size=(seq.size(1),), fill_value=seq.size(0), dtype=torch.long)
+            print(f'text: {texts, texts.size()} | seq: {seq, seq.size()}')
+            print(f'lens: {texts_len} | {seq_len}')
+            losses['loss_recog'] = self.ctc_loss(seq, texts, seq_len, texts_len)
+            print(losses['loss_recog'])
         return losses
 
     @force_fp32(apply_to=('cls_score', 'bbox_pred'))

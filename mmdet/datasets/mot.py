@@ -9,6 +9,7 @@ from .custom import CustomDataset
 class MOTDataset(CustomDataset):
 
     CLASSES = ('1981_Series', '2003_Series', '2014_Series', 'Others')
+    abc = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#'
 
     def load_annotations(self, ann_file, ann_dict):
         img_infos = []
@@ -33,3 +34,5 @@ class MOTDataset(CustomDataset):
         img_id = self.img_infos[idx]['id']
         ann =  self.ann_dict[img_id]
         return ann
+
+

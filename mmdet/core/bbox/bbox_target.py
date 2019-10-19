@@ -8,17 +8,19 @@ def bbox_target(pos_bboxes_list,
                 neg_bboxes_list,
                 pos_gt_bboxes_list,
                 pos_gt_labels_list,
+                pos_gt_texts_list,
                 cfg,
                 reg_classes=1,
                 target_means=[.0, .0, .0, .0],
                 target_stds=[1.0, 1.0, 1.0, 1.0],
                 concat=True):
-    labels, label_weights, bbox_targets, bbox_weights = multi_apply(
+    labels, label_weights, bbox_targets, bbox_weights, texts = multi_apply(
         bbox_target_single,
         pos_bboxes_list,
         neg_bboxes_list,
         pos_gt_bboxes_list,
         pos_gt_labels_list,
+        pos_gt_texts_list,
         cfg=cfg,
         reg_classes=reg_classes,
         target_means=target_means,
@@ -29,13 +31,15 @@ def bbox_target(pos_bboxes_list,
         label_weights = torch.cat(label_weights, 0)
         bbox_targets = torch.cat(bbox_targets, 0)
         bbox_weights = torch.cat(bbox_weights, 0)
-    return labels, label_weights, bbox_targets, bbox_weights
+        texts = torch.cat(texts, 0)
+    return labels, label_weights, bbox_targets, bbox_weights, texts
 
 
 def bbox_target_single(pos_bboxes,
                        neg_bboxes,
                        pos_gt_bboxes,
                        pos_gt_labels,
+                       pos_gt_texts,
                        cfg,
                        reg_classes=1,
                        target_means=[.0, .0, .0, .0],
@@ -47,8 +51,10 @@ def bbox_target_single(pos_bboxes,
     label_weights = pos_bboxes.new_zeros(num_samples)
     bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
     bbox_weights = pos_bboxes.new_zeros(num_samples, 4)
+    texts = pos_bboxes.new_zeros((num_samples, 7), dtype=torch.long)
     if num_pos > 0:
         labels[:num_pos] = pos_gt_labels
+        texts[:num_pos]  = pos_gt_texts
         pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
         label_weights[:num_pos] = pos_weight
         pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, target_means,
@@ -58,7 +64,7 @@ def bbox_target_single(pos_bboxes,
     if num_neg > 0:
         label_weights[-num_neg:] = 1.0
 
-    return labels, label_weights, bbox_targets, bbox_weights
+    return labels, label_weights, bbox_targets, bbox_weights, texts
 
 
 def expand_target(bbox_targets, bbox_weights, labels, num_classes):

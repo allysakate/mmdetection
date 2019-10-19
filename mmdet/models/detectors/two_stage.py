@@ -157,7 +157,7 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
 
         # assign gts and sample proposals
         if self.with_bbox or self.with_mask or self.with_recog:
-            bbox_assigner = build_assigner(self.train_cfg.rcnn.assigner)
+            bbox_assigner = build_assigner(self.train_cfg.rcnn.assigner)            
             bbox_sampler = build_sampler(
                 self.train_cfg.rcnn.sampler, context=self)
             num_imgs = img.size(0)
@@ -189,30 +189,16 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
                 bbox_feats = self.shared_head(bbox_feats)
             cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
+            if self.recog_head:
+                seq = self.recog_head(x,rois)
+
             bbox_targets = self.bbox_head.get_target(sampling_results,
-                                                     gt_bboxes, gt_labels,gt_texts,
-                                                     self.train_cfg.rcnn)
-            loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
+                                                     gt_bboxes, gt_labels, gt_texts, self.train_cfg.rcnn)
+            loss_bbox = self.bbox_head.loss(cls_score, bbox_pred, seq,
                                             *bbox_targets)
             losses.update(loss_bbox)
-
-        # bbox head forward and loss
-        if self.recog_head:
-            rois = bbox2roi([res.bboxes for res in sampling_results])
-            # TODO: a more flexible way to decide which feature maps to use
-            bbox_feats = self.bbox_roi_extractor(
-                x[:self.bbox_roi_extractor.num_inputs], rois)
-            # if self.with_shared_head:
-            #     bbox_feats = self.shared_head(bbox_feats)
-            seq = self.recog_head(x,rois)
-            
-            bbox_targets = self.recog_head.get_target(sampling_results,
-                                                     gt_texts,
-                                                     self.train_cfg.rcnn)
-            loss_bbox = self.recog_head.loss(seq, *bbox_targets)
-            losses.update(loss_bbox)
-
-
+            print(losses)
+        
         # mask head forward and loss
         if self.with_mask:
             if not self.share_roi_extractor:

@@ -16,8 +16,11 @@ class SamplingResult(object):
         self.pos_gt_bboxes = gt_bboxes[self.pos_assigned_gt_inds, :]
         if assign_result.labels is not None:
             self.pos_gt_labels = assign_result.labels[pos_inds]
+            self.pos_gt_texts  = assign_result.texts[pos_inds]
         else:
             self.pos_gt_labels = None
+            self.pos_gt_texts = None
+
 
     @property
     def bboxes(self):

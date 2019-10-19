@@ -43,8 +43,15 @@ model = dict(
         reg_class_agnostic=False,
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-        loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
-)
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
+    recog_head=dict(
+        type='CRNN',
+        roi_layer=dict(type='RoIPool', out_size=[4,20]),
+        feat_strides=[4, 8, 16, 32],
+        abc_len = 37,
+        rnn_hid_size=256,
+        rnn_n_layer=2)
+    )
 
 # model training and testing settings
 train_cfg = dict(
@@ -106,7 +113,7 @@ test_cfg = dict(
 )
 # dataset settings
 dataset_type = 'MOTDataset'
-data_root = 'data/CVAT_track/'
+data_root = 'data/CVAT/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -140,7 +147,7 @@ data = dict(
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'train/train.pkl',
-        img_prefix=data_root + 'train/image/',
+        img_prefix=data_root + 'train/images/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
