@@ -94,6 +94,11 @@ def plot_sequence(tracks, db, output_dir):
 
 	print("[*] Plotting whole sequence to {}".format(output_dir))
 
+	text_design = f'{output_dir}/res_track.txt'
+	if osp.exists(text_design):
+		os.remove(text_design)
+
+
 	if not osp.exists(output_dir):
 		os.makedirs(output_dir)
 
@@ -102,6 +107,9 @@ def plot_sequence(tracks, db, output_dir):
 	loop_cy_iter = cyl()
 	styles = defaultdict(lambda : next(loop_cy_iter))
 
+	#<frame>, <id>, <bb_left>, <bb_top>, <bb_width>, <bb_height>, <conf>, <x>, <y>, <z>
+	frame_no = 1
+	res_track = []
 	for i,v in enumerate(db):
 		img_meta = v['img_meta'][0].data[0]
 		im_path = img_meta[0]['filename']
@@ -124,6 +132,9 @@ def plot_sequence(tracks, db, output_dir):
 		for j,t in tracks.items():
 			if i in t.keys():
 				t_i = t[i]
+				res = [frame_no,j,t_i[0],t_i[1],t_i[2]-t_i[0],t_i[3]-t_i[1],-1,-1,-1,-1]
+				print(res)
+				res_track.append(res)
 				ax.add_patch(
 					plt.Rectangle((t_i[0], t_i[1]),
 							t_i[2] - t_i[0],
@@ -133,12 +144,23 @@ def plot_sequence(tracks, db, output_dir):
 				text = f'{j}_{t_i[5]}'
 				ax.annotate(text, (t_i[0] + (t_i[2] - t_i[0]) / 2.0, t_i[1] + (t_i[3] - t_i[1]) / 2.0),
 				            color=styles[j]['ec'], weight='bold', fontsize=15, ha='center', va='center')
-
+		
+		frame_no += 1
 		plt.axis('off')
 		# plt.tight_layout()
 		plt.draw()
 		plt.savefig(im_output, dpi=100)
 		plt.close()
+	print(res_track)
+	with open(text_design,'a') as textfile:
+		for res in res_track:
+			res = [str(r)  for r in res]
+			str_res = ','.join(res)
+			textfile.writelines(str_res + '\n')
+	textfile.close()
+
+
+
 
 
 def plot_tracks(blobs, tracks, gt_tracks=None, output_dir=None, name=None):
