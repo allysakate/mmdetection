@@ -136,10 +136,10 @@ class BBoxHead(nn.Module):
         if seq is not None:
             texts_len = torch.tensor([t.nonzero().size(0) for t in texts], dtype=torch.long)
             seq_len = torch.full(size=(seq.size(1),), fill_value=seq.size(0), dtype=torch.long)
-            print(f'text: {texts, texts.size()} | seq: {seq, seq.size()}')
-            print(f'lens: {texts_len} | {seq_len}')
+            #print(f'text: {texts, texts.size()} | seq: {seq, seq.size()}')
+            #print(f'lens: {texts_len} | {seq_len}')
             losses['loss_recog'] = self.ctc_loss(seq, texts, seq_len, texts_len)
-            print(losses['loss_recog'])
+            #print(losses['loss_recog'])
         return losses
 
     @force_fp32(apply_to=('cls_score', 'bbox_pred'))

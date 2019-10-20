@@ -72,5 +72,4 @@ class CRNN(nn.Module):
         output = self.rnn(conv)
         #output = self.linear(output)             
         output = self.softmax(output)
-        print(output.size())
         return output
