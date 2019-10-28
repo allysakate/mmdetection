@@ -138,7 +138,8 @@ class BBoxHead(nn.Module):
             seq_len = torch.full(size=(seq.size(1),), fill_value=seq.size(0), dtype=torch.long)
             #print(f'text: {texts, texts.size()} | seq: {seq, seq.size()}')
             #print(f'lens: {texts_len} | {seq_len}')
-            losses['loss_recog'] = self.ctc_loss(seq, texts, seq_len, texts_len)
+            #print(f'seq.size: {seq.size(0)}')
+            losses['loss_recog'] = self.ctc_loss(seq, texts, seq_len, texts_len)/seq.size(0)
             #print(losses['loss_recog'])
         return losses
 

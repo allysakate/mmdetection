@@ -18,7 +18,7 @@ model = dict(
         type='RPNHead',
         in_channels=256,
         feat_channels=256,
-        anchor_scales=[8],
+        anchor_scales=[5, 8, 11, 14, 17, 20],
         anchor_ratios=[0.5, 1.0, 2.0],
         anchor_strides=[4, 8, 16, 32, 64],
         target_means=[.0, .0, .0, .0],
@@ -28,15 +28,15 @@ model = dict(
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
     bbox_roi_extractor=dict(
         type='SingleRoIExtractor',
-        roi_layer=dict(type='RoIPool', out_size=7),
+        roi_layer=dict(type='RoIPool', out_size=[4,20]),
         out_channels=256,
         featmap_strides=[4, 8, 16, 32]),
     bbox_head=dict(
         type='SharedFCBBoxHead',
         num_fcs=2,
         in_channels=256,
-        fc_out_channels=1024,
-        roi_feat_size=7,
+        fc_out_channels=512,
+        roi_feat_size=[4,20],
         num_classes=5,
         target_means=[0., 0., 0., 0.],
         target_stds=[0.1, 0.1, 0.2, 0.2],
@@ -46,11 +46,12 @@ model = dict(
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
     recog_head=dict(
         type='CRNN',
-        roi_layer=dict(type='RoIPool', out_size=[4,20]),
-        feat_strides=[4, 8, 16, 32],
-        abc_len = 37,
+    #    seq_proj = [19,19],
+        abc = '1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ#',
         rnn_hid_size=256,
-        rnn_n_layer=2)
+        rnn_n_layer=2,
+        rnn_dropout=0,
+        decode=False)
     )
 
 # model training and testing settings

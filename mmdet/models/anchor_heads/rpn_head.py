@@ -16,19 +16,24 @@ class RPNHead(AnchorHead):
         super(RPNHead, self).__init__(2, in_channels, **kwargs)
 
     def _init_layers(self):
-        self.rpn_conv = nn.Conv2d(
-            self.in_channels, self.feat_channels, 3, padding=1)
+        self.rpn_conv1 = nn.Conv2d(
+            self.in_channels, self.feat_channels, (3, 5), padding=1)
+        self.rpn_conv2 = nn.Conv2d(
+            self.in_channels, self.feat_channels, (1, 3), padding=1)
         self.rpn_cls = nn.Conv2d(self.feat_channels,
                                  self.num_anchors * self.cls_out_channels, 1)
         self.rpn_reg = nn.Conv2d(self.feat_channels, self.num_anchors * 4, 1)
 
     def init_weights(self):
-        normal_init(self.rpn_conv, std=0.01)
+        normal_init(self.rpn_conv1, std=0.01)
+        normal_init(self.rpn_conv2, std=0.01)
         normal_init(self.rpn_cls, std=0.01)
         normal_init(self.rpn_reg, std=0.01)
 
     def forward_single(self, x):
-        x = self.rpn_conv(x)
+        x = self.rpn_conv1(x)
+        x = F.relu(x, inplace=True)
+        x = self.rpn_conv2(x)
         x = F.relu(x, inplace=True)
         rpn_cls_score = self.rpn_cls(x)
         rpn_bbox_pred = self.rpn_reg(x)

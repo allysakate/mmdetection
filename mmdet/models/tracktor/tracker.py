@@ -61,7 +61,7 @@ class Tracker():
 	def add(self, new_det_pos, new_det_scores, new_det_features, new_det_labels):
 		"""Initializes new Track objects and saves them."""
 		num_new = new_det_pos.size(0)
-	#	print(f'add_num_new: {num_new}')
+		#print(f'add_num_new: {num_new}')
 
 		for i in range(num_new):
 			#pos, score, label, track_id, features, inactive_patience, max_features_num):
@@ -79,7 +79,7 @@ class Tracker():
 		with torch.no_grad():
 			multi_bboxes, multi_scores = self.obj_detect(proposals=pos, return_loss=False, track=True, regress=True, **blob)
 
-	#	print(f'regress_bbox_score: {multi_bboxes} | {multi_bboxes.shape} | {multi_scores} | {multi_scores.shape}')
+		#print(f'regress_bbox_score: {multi_bboxes} | {multi_bboxes.shape} | {multi_scores} | {multi_scores.shape}')
 		cls_boxes = []
 		cls_score = []
 		cls_label = []
@@ -87,7 +87,7 @@ class Tracker():
 		base_label = torch.ones((list(multi_scores.shape)[0],5),dtype=float)
 		label_index = torch.tensor((0,1,2,3,4),dtype=float)
 		multi_labels = base_label * label_index
-		#	print(f'regress_t:{t.pos} | {t.score} | {t.label}')
+			#print(f'regress_t:{t.pos} | {t.score} | {t.label}')
 		for i in range(1, self.cl):
 			cls_inds = multi_scores[:, i] > self.detection_thresh
 			if not cls_inds.any():
@@ -103,8 +103,8 @@ class Tracker():
 			cls_boxes.append(_bboxes)
 			cls_label.append(_labels)
 			cls_score.append(_scores)
-	#	print(f'reg_scores:{cls_boxes} | {cls_score} | {cls_label}')
-	#	print(len(self.tracks))
+		#print(f'reg_scores:{cls_boxes} | {cls_score} | {cls_label}')
+		#print(len(self.tracks))
 		for i in range(len(self.tracks)-1,-1,-1):
 			t = self.tracks[i]
 			try:		
@@ -117,7 +117,7 @@ class Tracker():
 					t.label = cls_label[i]
 			except:
 				self.tracks_to_inactive([t])
-		#	print(f'reg_track:{t.pos} | {t.score} | {t.label}')
+			#print(f'reg_track:{t.pos} | {t.score} | {t.label}')
 	
 		return torch.Tensor(s[::-1]).cuda()
 
@@ -342,10 +342,10 @@ class Tracker():
 		"""This function should be called every timestep to perform tracking with a blob
 		containing the image information.
 		"""
-	#	print(f'blob: {blob}')
+		#print(f'blob: {blob}')
 		for t in self.tracks:
 			t.last_pos = t.pos.clone()
-		#	print(f'step_last_pos: {t.last_pos}')
+			#print(f'step_last_pos: {t.last_pos}')
 
 		###########################
 		# Look for new detections #
@@ -353,14 +353,14 @@ class Tracker():
 		with torch.no_grad():
 			det_bboxes, det_labels = self.obj_detect(return_loss=False, track=True, regress=False, **blob)
 
-	#	print(f'det: {det_bboxes}')
+		#print(f'det: {det_bboxes}')
 
 		##################
 		# Predict tracks #
 		##################
 		num_tracks = 0
 		nms_inp_reg = torch.zeros(0).cuda()
-	#	print(f'track_len: {len(self.tracks)}')
+		#print(f'track_len: {len(self.tracks)}')
 		if len(self.tracks):
 			# align
 			if self.do_align:
@@ -370,7 +370,7 @@ class Tracker():
 				self.motion()
 			#regress
 			regress_scores = self.regress_tracks(blob)
-		#	print(f'regress_scores: {regress_scores}')
+			#print(f'regress_scores: {regress_scores}')
 
 			if len(self.tracks):
 
@@ -380,7 +380,7 @@ class Tracker():
 				# nms here if tracks overlap
 
 				pos_reg = self.get_pos()
-			#	print(f'inp_reg: {pos_reg} | {regress_scores} | {regress_scores.view(-1,1)}')
+				#print(f'inp_reg: {pos_reg} | {regress_scores} | {regress_scores.view(-1,1)}')
 				if len(pos_reg) == 1: 
 					nms_inp_reg = torch.cat((pos_reg[0], regress_scores.add_(3).view(-1 ,1)), 1)
 				else:
@@ -409,7 +409,7 @@ class Tracker():
 					nms_inp_reg = torch.zeros(0).cuda()
 					num_tracks = 0
 
-			#	print(f'nms_inp_reg: {nms_inp_reg}')
+				#print(f'nms_inp_reg: {nms_inp_reg}')
 
 		#####################
 		# Create new tracks #
@@ -427,7 +427,7 @@ class Tracker():
 			nms_inp_det = torch.zeros(0).cuda()
 			nms_inp_labels  = torch.zeros(0).cuda()
 
-	#	print(f'nms_inp_det_box: {nms_inp_det}')
+		#print(f'nms_inp_det_box: {nms_inp_det}')
 
 
 		if nms_inp_det.nelement() > 0:
@@ -436,10 +436,10 @@ class Tracker():
 			keep = nms_op(nms_inp_det, self.detection_nms_thresh)[1]
 			nms_inp_det = nms_inp_det[keep]
 			nms_inp_labels = nms_inp_labels[keep]
-		#	print(f'nms_inp_det_keep: {nms_inp_det} | {nms_inp_labels}')
+			#print(f'nms_inp_det_keep: {nms_inp_det} | {nms_inp_labels}')
 			# check with every track in a single run (problem if tracks delete each other)
 			for i in range(num_tracks):
-			#	print(f'nms_inp_reg[i]: {nms_inp_reg[i]}')
+				#print(f'nms_inp_reg[i]: {nms_inp_reg[i]}')
 				nms_inp = torch.cat((nms_inp_reg[i].view(1,-1), nms_inp_det), 0)
 				keep = nms_op(nms_inp, self.detection_nms_thresh)[1]
 				keep = keep[torch.ge(keep,1)]
@@ -450,7 +450,7 @@ class Tracker():
 				nms_inp_det = nms_inp[keep]
 				det_size = list(nms_inp_det.shape)[0]
 				nms_inp_labels  = torch.zeros(det_size).cuda()
-			#	print(f'nms_inp_det_track: {nms_inp_det} | {nms_inp_labels}')
+				#print(f'nms_inp_det_track: {nms_inp_det} | {nms_inp_labels}')
 
 		
 		if nms_inp_det.nelement() > 0:
@@ -458,11 +458,11 @@ class Tracker():
 			new_det_scores = nms_inp_det[:, 4]
 			new_det_labels = nms_inp_labels
 		
-		#	print(f'nms_inp_det: {nms_inp_det}')
+			#print(f'nms_inp_det: {nms_inp_det}')
 
 			# try to redientify tracks
 			new_det_pos, new_det_scores, new_det_features, new_det_labels = self.reid(blob, new_det_pos, new_det_scores, new_det_labels)
-		#	print(f'reid: {new_det_pos} | {new_det_scores}')
+			#print(f'reid: {new_det_pos} | {new_det_scores}')
 
 	
 			# add new
@@ -485,7 +485,7 @@ class Tracker():
 
 		self.im_index += 1
 		self.last_image = blob['img'][0].data[0]
-	#	print(f'last image: {self.last_image}')
+		#print(f'last image: {self.last_image}')
 
 		self.clear_inactive()
 
