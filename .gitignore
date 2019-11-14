@@ -130,3 +130,4 @@ results/*.pkl
 build_from_cfg/
 publish/
 output/
+results/
