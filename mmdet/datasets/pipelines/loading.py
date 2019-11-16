@@ -71,10 +71,6 @@ class LoadAnnotations(object):
         results['gt_labels'] = results['ann_info']['labels']
         return results
 
-    def _load_trackids(self, results):
-        results['gt_trackids'] = results['ann_info']['trackids']
-        return results
-
     def _poly2mask(self, mask_ann, img_h, img_w):
         if isinstance(mask_ann, list):
             # polygon -- a single object might consist of multiple parts
@@ -112,8 +108,6 @@ class LoadAnnotations(object):
                 return None
         if self.with_label:
             results = self._load_labels(results)
-        if self.with_trackid:
-            results = self._load_trackids(results)
         if self.with_mask:
             results = self._load_masks(results)
         if self.with_seg:

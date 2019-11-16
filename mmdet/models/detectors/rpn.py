@@ -59,7 +59,7 @@ class RPN(BaseDetector, RPNTestMixin):
             *rpn_loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         return losses
 
-    def simple_test(self, img, img_meta, rescale=False):
+    def simple_test(self, img, img_meta, proposals=None, rescale=False):
         x = self.extract_feat(img)
         proposal_list = self.simple_test_rpn(x, img_meta, self.test_cfg.rpn)
         if rescale:
@@ -81,7 +81,7 @@ class RPN(BaseDetector, RPNTestMixin):
         # TODO: remove this restriction
         return proposal_list[0].cpu().numpy()
 
-    def show_result(self, data, result, dataset=None, top_k=20):
+    def show_result(self, data, result, out_file, dataset=None, top_k=20):
         """Show RPN proposals on the image.
 
         Although we assume batch size is 1, this method supports arbitrary
@@ -94,4 +94,4 @@ class RPN(BaseDetector, RPNTestMixin):
         for img, img_meta in zip(imgs, img_metas):
             h, w, _ = img_meta['img_shape']
             img_show = img[:h, :w, :]
-            mmcv.imshow_bboxes(img_show, result, top_k=top_k)
+            mmcv.imshow_bboxes(img_show, result, out_file, top_k=top_k)

@@ -50,7 +50,9 @@ colors = ['aliceblue', 'antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', '
 'purple', 'rebeccapurple', 'red', 'rosybrown', 'royalblue', 'saddlebrown', 'salmon',
 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slateblue',
 'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle',
-'tomato', 'turquoise', 'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen']
+'tomato', 'turquoise', 'violet', 'yellow', 'yellowgreen']
+
+CLASSES = ['1981_Series', '2003_Series', '2014_Series', 'Others']
 
 
 # From frcnn/utils/bbox.py
@@ -141,9 +143,13 @@ def plot_sequence(tracks, db, output_dir):
 							t_i[3] - t_i[1],
 							fill=False,
 							linewidth=4.0, **styles[j]))
-				text = f'{j}_{t_i[5]}'
+				try:
+					plate_class = CLASSES[t_i[5]-1]
+				except:
+					plate_class = t_i[5]-1
+				text = f'{j}_{plate_class}'
 				ax.annotate(text, (t_i[0] + (t_i[2] - t_i[0]) / 2.0, t_i[1] + (t_i[3] - t_i[1]) / 2.0),
-				            color=styles[j]['ec'], weight='bold', fontsize=15, ha='center', va='center')
+				            color=styles[j]['ec'], weight='bold', fontsize=10, ha='center', va='center')
 		
 		frame_no += 1
 		plt.axis('off')

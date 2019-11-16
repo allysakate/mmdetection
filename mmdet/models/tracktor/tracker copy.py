@@ -80,10 +80,10 @@ class Tracker():
 		num_new = new_det_pos.size(0)
 		for i in range(num_new):
 			#pos, score, label, track_id, features, inactive_patience, max_features_num):
-			try:
-				track_label = torch.tensor([new_det_labels[i]]).cuda()
-			except:
-				pass
+			track_label = new_det_labels[i]
+			if isinstance(track_label, int):
+				track_label = torch.tensor([track_label]).cuda()
+				
 			track_input = Track(new_det_pos[i].view(1,-1), new_det_scores[i], track_label, self.track_num + i, None,
 																	self.inactive_patience, None)
 			self.tracks.append(track_input)
@@ -97,57 +97,38 @@ class Tracker():
 		pos, lbl = self.get_pos()
 		# regress
 		with torch.no_grad():
-			bboxes, scores = self.obj_detect(return_loss=False, proposals=pos, track=True, regress=True, **blob)
-
-		base_label = torch.ones((list(scores.shape)[0],4),dtype=int)
-		label_index = torch.tensor((1,2,3,4),dtype=int)
-		labels = base_label * label_index
-
-		score_list = []
-		label_list = []
-		bbox_list = []
+			pred_bbox_score, pred_labels = self.obj_detect(return_loss=False, proposals=pos, track=True, regress=True, **blob)
+		pred_scores = pred_bbox_score[:, 4]
+		pos_idx     = torch.gt(pred_scores,self.detection_thresh).nonzero().view(-1)
+		pred_scores = pred_scores[pos_idx]
+		pred_bboxes = pred_bbox_score[:,:4]
+		pred_bboxes = pred_bboxes[pos_idx]
+		pred_labels = pred_labels[pos_idx]
+		print(f'Prediction: Bbox={pred_bboxes} \n \t Score={pred_scores} \n  \t Label={pred_labels}')
 		s = []
-		for i in range(scores.size(0)):
-			cls_inds = scores[i][1:5] > self.detection_thresh
-			if not cls_inds.any():
-				continue
-			cls_score=scores[i][1:5][cls_inds].tolist()
-			score_list.append(cls_score[0])
-
-			cls_label=labels[i][cls_inds].tolist()
-			label_list.append(cls_label[0])
-
-			cls_box = []
-			for b in range(1,self.cl):
-				box = bboxes[i][b*4:(b+1)*4].tolist()
-				cls_box.append(box)
-			cls_box = torch.tensor(cls_box)[cls_inds].tolist()
-			bbox_list.append(cls_box[0])  
-
-		cls_scores = torch.tensor(score_list).cuda()
-		cls_labels = torch.tensor(label_list).cuda()
-		cls_bboxes = torch.tensor(bbox_list).cuda()
-
-		print(f'Prediction: Bbox={cls_bboxes} \n \t Score={cls_scores} \n  \t Label={cls_labels}')
-
-	#	print(len(self.tracks))
-		for i in range(len(self.tracks)-1,-1,-1):
-			t = self.tracks[i]
-			try:		
-				t.score = cls_scores[i]
-				print(t.score)
+		pred_len = len(pred_bboxes)
+		track_len = len(self.tracks)
+		if track_len >= pred_len:
+			range_len = track_len
+		else:
+			range_len = pred_len
+		for i in range(track_len-1,-1,-1):
+			#print(f'i: {i} | {len(self.tracks)-1,-1,-1}')
+			try:
+				t = self.tracks[i]
+				t.score = pred_scores[i]
 				if t.score <= self.regression_thresh:
 					self.tracks_to_inactive([t])
 					print(f'Regression To Inactive: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label}')
 				else:
 					s.append(t.score)
-					t.pos = cls_bboxes[i].view(1,-1)
-					t.label = cls_labels[i]
-					print(f'Regression MultiClass: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label} \n')
+					t.pos = pred_bboxes[i].view(1,-1)
+					t.label = torch.tensor(pred_labels[i]).cuda()
+				print(f'Regression MultiClass: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label} \n')
 			except:
+				t = self.tracks[i]
 				self.tracks_to_inactive([t])
 				print(f'ERROR: Reg To Inactive: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label}')
-		#	print(f'reg_track:{t.pos} | {t.score} | {t.label}')
 	
 		return torch.Tensor(s[::-1]).cuda()
 
@@ -155,17 +136,12 @@ class Tracker():
 		"""Get the positions of all active tracks."""
 		if len(self.tracks) == 1:
 			pos = [self.tracks[0].pos]
-			lbl = [self.tracks[0].label.cuda()]
+			lbl = [self.tracks[0].label]
 		elif len(self.tracks) > 1:
-			pos = []
-			lbl = []
+			pos = torch.stack([t.pos for t in self.tracks])
 			for t in self.tracks:
-				p = t.pos.tolist()
-				pos.append(p[0])
-				l = t.label
-				lbl.append(l)
-			lbl = torch.tensor(lbl).cuda()
-			pos = torch.tensor(pos)
+				print(t.label)
+			lbl = torch.stack([t.label for t in self.tracks])
 		else:
 			pos = torch.zeros(0).cuda()
 			lbl = torch.tensor([0])
@@ -508,12 +484,12 @@ class Tracker():
 				#print(f'nms_inp[i]:{i} | {nms_pos} | {nms_lbl}')
 				nms_keep = nms_op(nms_pos, self.detection_nms_thresh)
 				print(f'Reg-Det To Keep: {nms_keep}')
-				# try:
-				# 	scores_keep = nms_keep[0][:, 4]
-				# 	keep = torch.ge(scores_keep)
-				# except:
-				keep = nms_keep[1]
-				keep = keep[torch.ge(keep,1)]
+				try:
+					scores_keep = nms_keep[0][:, 4]
+					keep = torch.ge(scores_keep)
+				except:
+					keep = nms_keep[1]
+					keep = keep[torch.ge(keep,1)]
 				print(f'Filter: {keep}')
 				if keep.nelement() == 0:
 					new_track_bbox = new_track_bbox.new(0)
@@ -528,7 +504,7 @@ class Tracker():
 			new_det_scores = new_track_bbox[:, 4]
 			new_det_labels = new_track_label
 		
-			print(f'New: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
+			print(f'New Pos: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
 
 			# try to redientify tracks
 			if self.vid_framerate < 24:

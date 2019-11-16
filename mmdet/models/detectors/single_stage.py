@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from mmdet.core import bbox2result
+from mmdet.core import bbox2result, bbox2roi
 from .. import builder
 from ..registry import DETECTORS
 from .base import BaseDetector
@@ -60,15 +60,22 @@ class SingleStageDetector(BaseDetector):
             *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         return losses
 
-    def simple_test(self, img, img_meta, rescale=False):
+    def simple_test(self, img, img_meta, proposals=None, rescale=False, track=False, regress=False):
         x = self.extract_feat(img)
         outs = self.bbox_head(x)
-        bbox_inputs = outs + (img_meta, self.test_cfg, rescale)
+        bbox_inputs = outs + (img_meta, self.test_cfg, rescale, proposals, regress)
         bbox_list = self.bbox_head.get_bboxes(*bbox_inputs)
-        bbox_results = [
-            bbox2result(det_bboxes, det_labels, self.bbox_head.num_classes)
-            for det_bboxes, det_labels in bbox_list
-        ]
+        if track:
+            det_bbox_list, det_labels_list = [], []
+            for det_bboxes, det_labels in bbox_list:
+                det_bbox_list.append(det_bboxes)
+                det_labels_list.append(det_labels)
+            return det_bbox_list[0], det_labels_list[0]
+        else:
+            bbox_results = [
+                bbox2result(det_bboxes, det_labels, self.bbox_head.num_classes)
+                for det_bboxes, det_labels in bbox_list
+            ]
         return bbox_results[0]
 
     def aug_test(self, imgs, img_metas, rescale=False):

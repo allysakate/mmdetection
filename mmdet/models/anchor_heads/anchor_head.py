@@ -195,17 +195,65 @@ class AnchorHead(nn.Module):
             cfg=cfg)
         return dict(loss_cls=losses_cls, loss_bbox=losses_bbox)
 
+    def get_anchor_proposals(self, proposals, cls_scores):
+        print(proposals)
+        input_size=512
+        basesize_ratio_range=[0.15, 0.9]
+        anchor_ratios=[[2], [2, 3], [2, 3], [2, 3], [2, 3], [2], [2]]
+        min_ratio, max_ratio = basesize_ratio_range
+        min_ratio = int(min_ratio * 100)
+        max_ratio = int(max_ratio * 100)
+        step = int(np.floor(max_ratio - min_ratio) / (len(self.in_channels) - 2))
+        min_sizes = []
+        max_sizes = []
+        for r in range(int(min_ratio), int(max_ratio) + 1, step):
+            min_sizes.append(int(input_size * r / 100))
+            max_sizes.append(int(input_size * (r + step) / 100))
+
+        if basesize_ratio_range[0] == 0.1:  # SSD512 COCO
+            min_sizes.insert(0, int(input_size * 4 / 100))
+            max_sizes.insert(0, int(input_size * 10 / 100))
+        elif basesize_ratio_range[0] == 0.15:  # SSD512 VOC
+            min_sizes.insert(0, int(input_size * 7 / 100))
+            max_sizes.insert(0, int(input_size * 15 / 100))
+        anchor_generators = []
+        for i in range(len(proposals)):
+            pos = [element.item() for element in proposals[i].flatten()]
+            len_k = int(len(self.anchor_strides) / len(proposals))
+            for k in range(len(self.anchor_strides)):
+                base_size = min_sizes[k]
+                stride = self.anchor_strides[k]
+                ctr = ((pos[2] - pos[0]) / 2., (pos[3] - pos[1]) / 2.)
+                scales = [1., np.sqrt(max_sizes[k] / min_sizes[k])]
+                ratios = [1.]
+                for r in anchor_ratios[k]:
+                    ratios += [1 / r, r]  # 4 or 6 ratio
+                anchor_generator = AnchorGenerator(
+                    base_size, scales, ratios, scale_major=False, ctr=ctr)
+                indices = list(range(len(ratios)))
+                indices.insert(1, len(indices))
+                anchor_generator.base_anchors = torch.index_select(
+                    anchor_generator.base_anchors, 0, torch.LongTensor(indices))
+                anchor_generators.append(anchor_generator)
+
+            mlvl_anchors = [anchor_generators[i].grid_anchors(cls_scores[i].size()[-2:],self.anchor_strides[i]) for i in range(len(cls_scores))]
+            return mlvl_anchors
+
+
     @force_fp32(apply_to=('cls_scores', 'bbox_preds'))
     def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg,
-                   rescale=False):
+                   rescale=False, proposals=None, regress=False):
+        #print(f'get_bbox: len {len(cls_scores)} \n size:{cls_scores[0].size()} \n -2:{cls_scores[0].size()[-2:]}')
         assert len(cls_scores) == len(bbox_preds)
         num_levels = len(cls_scores)
-
-        mlvl_anchors = [
-            self.anchor_generators[i].grid_anchors(cls_scores[i].size()[-2:],
-                                                   self.anchor_strides[i])
-            for i in range(num_levels)
-        ]
+        if regress:
+            mlvl_anchors = self.get_anchor_proposals(proposals,cls_scores)
+        else:
+            mlvl_anchors = [
+                self.anchor_generators[i].grid_anchors(cls_scores[i].size()[-2:],
+                                                    self.anchor_strides[i])
+                for i in range(num_levels)
+            ]
         result_list = []
         for img_id in range(len(img_metas)):
             cls_score_list = [
@@ -216,10 +264,10 @@ class AnchorHead(nn.Module):
             ]
             img_shape = img_metas[img_id]['img_shape']
             scale_factor = img_metas[img_id]['scale_factor']
-            proposals = self.get_bboxes_single(cls_score_list, bbox_pred_list,
+            gen_proposals = self.get_bboxes_single(cls_score_list, bbox_pred_list,
                                                mlvl_anchors, img_shape,
                                                scale_factor, cfg, rescale)
-            result_list.append(proposals)
+            result_list.append(gen_proposals)
         return result_list
 
     def get_bboxes_single(self,

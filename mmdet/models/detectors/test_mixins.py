@@ -1,6 +1,9 @@
 from mmdet.core import (bbox2roi, bbox_mapping, merge_aug_bboxes,
                         merge_aug_masks, merge_aug_proposals, multiclass_nms)
 
+import math
+import numpy as np
+import torch
 
 class RPNTestMixin(object):
 
@@ -35,6 +38,20 @@ class RPNTestMixin(object):
 
 class BBoxTestMixin(object):
 
+    def tile(self,a, dim, repeats):
+        init_dim = a.size(dim)
+        repeat_idx = [1] * a.dim()
+        repeat_idx[dim] = repeats
+        a = a.repeat(*(repeat_idx))
+        if a.is_cuda:  # use cuda-device if input was on cuda device already
+            order_index = torch.cuda.LongTensor(
+                torch.cat([init_dim * torch.arange(repeats, device=a.device) + i for i in range(init_dim)]))
+        else:
+            order_index = torch.LongTensor(
+                torch.cat([init_dim * torch.arange(repeats) + i for i in range(init_dim)]))
+
+        return torch.index_select(a, dim, order_index)
+
     def simple_test_bboxes(self,
                            x,
                            img_meta,
@@ -43,6 +60,9 @@ class BBoxTestMixin(object):
                            rescale=False,
                            regress=False):
         """Test only det bboxes without augmentation."""
+        len_prop = len(proposals)
+        if regress and len_prop > 1:
+            proposals = [proposals]
         rois = bbox2roi(proposals)
         roi_feats = self.bbox_roi_extractor(
             x[:len(self.bbox_roi_extractor.featmap_strides)], rois)

@@ -1,7 +1,7 @@
 '''
 Usage:
 python tools/train.py configs/faster_rcnn_r101_fpn_1x_mot.py
-python tools/publish_model.py work_dirs/faster_rcnn_r101_fpn_1x/latest.pth publish/faster_crnn_r101_fpn_1x_mot_10102019.pth
+python tools/publish_model.py work_dirs/faster_rcnn_r101_fpn_1x/latest.pth checkpoints/faster_crnn_r101_fpn_1x_mot_10102019.pth
 '''
 from __future__ import division
 import argparse

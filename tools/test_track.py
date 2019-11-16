@@ -24,9 +24,10 @@ from mmdet.models.tracktor import resnet50
 from mmdet.models.tracktor import Tracker
 from mmdet.models.tracktor import plot_sequence
 from tools.exec_time import Timer
+import cv2
 
 def single_gpu_test(model,data_loader,show=False, 
-                    tracktor_cfg=None,nms_cfg=None):
+                    tracktor_cfg=None,test_cfg=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -37,17 +38,30 @@ def single_gpu_test(model,data_loader,show=False,
     reid_network.eval()
     reid_network.cuda()
 
-    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, nms_cfg)
+    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, test_cfg)
 
     for i, data in enumerate(data_loader):
+        print()
+        # if i > 100:
         tracker.step(data)
+        result = tracker.get_results()
+            # img_meta = data['img_meta'][0].data[0]
+            # img_name = str(img_meta[0]['filename'])
+            # img = cv2.imread(img_name)
+            # print(img_name, type(img_name))
+            # print('<------------------------------------->')
+            # cv2.imshow('blob', cv2.resize(img, (860,540)))
+            # k=cv2.waitKey(0) & 0xFF
+            # if k==27:
+            #     break
+            #     cv2.destroyAllWindows()
         prog_bar.update()
     results = tracker.get_results()
     if tracktor_cfg.write_images:
         plot_sequence(results, data_loader, osp.join(tracktor_cfg.output_dir))
 
 def multi_gpu_test(model, data_loader, tmpdir=None, 
-                    tracktor_cfg=None,nms_cfg=None):
+                    tracktor_cfg=None,test_cfg=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -60,7 +74,7 @@ def multi_gpu_test(model, data_loader, tmpdir=None,
     reid_network.eval()
     reid_network.cuda()
 
-    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, nms_cfg)
+    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, test_cfg)
 
     for i, data in enumerate(data_loader):
         tracker.step(data)
@@ -115,9 +129,10 @@ def collect_results(result_part, size, tmpdir=None):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='MMDet test detector')
-    parser.add_argument('config', help='test config file path')
-    parser.add_argument('checkpoint', help='checkpoint file')
-    parser.add_argument('--out', help='output result file')
+    parser.add_argument('config', default='configs/faster_rcnn_r101_fpn_1x_mot.py', help='test config file path')
+    parser.add_argument('checkpoint', default='checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth',help='checkpoint file')
+    parser.add_argument('--out', default='results/results_track.pkl', help='output result file')
+    parser.add_argument('--double_stage', action='store_true', help='single/double (rcnn) stage detection')
     parser.add_argument(
         '--json_out',
         help='output result file name without extension',
@@ -191,15 +206,15 @@ def main():
         model.CLASSES = checkpoint['meta']['CLASSES']
     else:
         model.CLASSES = dataset.CLASSES
-
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
+
         outputs = single_gpu_test(model, data_loader, args.show, 
-                    tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
+                    tracktor_cfg=cfg.tracktor, test_cfg=cfg.test_cfg)
     else:
         model = MMDistributedDataParallel(model.cuda())
         outputs = multi_gpu_test(model, data_loader, args.tmpdir,
-                    tracktor_cfg=cfg.tracktor, nms_cfg=cfg.test_cfg.rcnn.nms)
+                    tracktor_cfg=cfg.tracktor, test_cfg=cfg.test_cfg)
 
     print(time.time()-start_time)
 if __name__ == '__main__':
