@@ -41,8 +41,8 @@ def single_gpu_test(model,data_loader,show=False,
     tracker = Tracker(model, reid_network, tracktor_cfg.tracker, test_cfg)
 
     for i, data in enumerate(data_loader):
-        print()
-        # if i > 100:
+        # print()
+        # if i > 40:
         tracker.step(data)
         result = tracker.get_results()
             # img_meta = data['img_meta'][0].data[0]

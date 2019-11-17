@@ -64,6 +64,16 @@ class Tracker():
 			print(f'Tracks_to_Inactive: id={t.id} | pos={t.pos} ')
 		self.inactive_tracks += tracks
 
+	def add(self, new_det_pos, new_det_scores, new_det_features, new_det_labels):
+		"""Initializes new Track objects and saves them for lowframe."""
+		num_new = new_det_pos.size(0)
+		for i in range(num_new):
+			#pos, score, label, track_id, features, inactive_patience, max_features_num):
+			track_input = Track(new_det_pos[i].view(1,-1), new_det_scores[i], new_det_labels[i], self.track_num + i, new_det_features[i].view(1,-1),
+																	self.inactive_patience, self.max_features_num)
+			self.tracks.append(track_input)
+		self.track_num += num_new
+	
 	def add_lowframe(self, new_det_pos, new_det_scores, new_det_features, new_det_labels):
 		"""Initializes new Track objects and saves them for lowframe."""
 		num_new = new_det_pos.size(0)
@@ -461,11 +471,15 @@ class Tracker():
 						predict_label = torch.tensor(predict_label.squeeze().tolist()).cuda()
 						nms_inp_reg = torch.cat((predict_bbox, torch.ones(predict_bbox.size(0)).add_(3).view(-1,1).cuda()),1)
 					
-					if self.vid_framerate < 24:
-						new_features = self.get_appearances(blob)
-						self.add_features(new_features)
-					else:
-						num_tracks = nms_inp_reg.size(0)
+					# if self.vid_framerate < 24:
+					# 	new_features = self.get_appearances(blob)
+					# 	self.add_features(new_features)
+
+					new_features = self.get_appearances(blob)
+					self.add_features(new_features)
+
+					num_tracks = nms_inp_reg.size(0)
+				
 				else:
 					nms_inp_reg = torch.zeros(0).cuda()
 					num_tracks = 0
@@ -531,20 +545,20 @@ class Tracker():
 			print(f'New: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
 
 			# try to redientify tracks
-			if self.vid_framerate < 24:
-				new_det_pos, new_det_scores, new_det_features, new_det_labels = self.reid(blob, new_det_pos, new_det_scores, new_det_labels)
-				print(f'reid: {new_det_pos} | {new_det_scores}')
+			#if self.vid_framerate < 24:
+			new_det_pos, new_det_scores, new_det_features, new_det_labels = self.reid(blob, new_det_pos, new_det_scores, new_det_labels)
+			print(f'reid: {new_det_pos} | {new_det_scores}')
 
 	
 			# add new
-			# if new_det_pos.nelement() > 0:
-			# 	self.add(new_det_pos, new_det_scores, new_det_features, new_det_labels)
-			
 			if new_det_pos.nelement() > 0:
-				if self.vid_framerate < 24:
-					self.add_lowframe(new_det_pos, new_det_scores, new_det_features, new_det_labels)
-				else:
-					self.add_highframe(new_det_pos, new_det_scores, new_det_labels)
+				self.add(new_det_pos, new_det_scores, new_det_features, new_det_labels)
+			
+			# if new_det_pos.nelement() > 0:
+			# 	if self.vid_framerate < 24:
+			# 		self.add_lowframe(new_det_pos, new_det_scores, new_det_features, new_det_labels)
+			# 	else:
+			# 		self.add_highframe(new_det_pos, new_det_scores, new_det_labels)
 
 		####################
 		# Generate Results #

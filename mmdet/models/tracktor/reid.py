@@ -77,28 +77,50 @@ class ResNet(models.ResNet):
             out = torch.sigmoid(out)
         return out
 
-    def build_crops(self, image, rois):
-        res = []
+    def get_rois(self, r, image, trans, res):
+        x0 = int(r[0])
+        y0 = int(r[1])
+        x1 = int(r[2])
+        y1 = int(r[3])
+        if x0 == x1:
+            if x0 != 0:
+                x0 -= 1
+            else:
+                x1 += 1
+        if y0 == y1:
+            if y0 != 0:
+                y0 -= 1
+            else:
+                y1 += 1
+        im = image[:,y0:y1,0:x1]
+        im = torch.from_numpy(im)
+        im = trans(im)
+        res.append(im)
+        return res
+
+    def build_crops(self, image, rois, zero=True):
         trans = Compose([ToPILImage(), Resize((128,256)), ToTensor()])
-        for r in rois:
-            x0 = int(r[0])
-            y0 = int(r[1])
-            x1 = int(r[2])
-            y1 = int(r[3])
-            if x0 == x1:
-                if x0 != 0:
-                    x0 -= 1
-                else:
-                    x1 += 1
-            if y0 == y1:
-                if y0 != 0:
-                    y0 -= 1
-                else:
-                    y1 += 1
-            im = image[:,y0:y1,0:x1]
-            im = torch.from_numpy(im)
-            im = trans(im)
-            res.append(im)
+        res=[]
+        try: 
+            rois.size(1)
+            len_rois = rois.size(0)
+        except:
+            len_rois = 1
+            zero = False
+            
+        print(rois, rois.size())
+        if len_rois == 1 :
+            if zero:
+                r = rois[0].tolist()
+            else:
+                r = rois.tolist()
+            res=self.get_rois(r,image,trans,res)
+        else:
+            for roi in rois:
+                print(roi)
+                roi = roi.tolist()
+                res=self.get_rois(roi,image,trans,res)
+        
         res = torch.stack(res, 0)
         res = res.cuda()
         return res
