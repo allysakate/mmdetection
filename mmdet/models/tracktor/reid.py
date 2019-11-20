@@ -108,7 +108,6 @@ class ResNet(models.ResNet):
             len_rois = 1
             zero = False
             
-        print(rois, rois.size())
         if len_rois == 1 :
             if zero:
                 r = rois[0].tolist()
@@ -117,7 +116,6 @@ class ResNet(models.ResNet):
             res=self.get_rois(r,image,trans,res)
         else:
             for roi in rois:
-                print(roi)
                 roi = roi.tolist()
                 res=self.get_rois(roi,image,trans,res)
         

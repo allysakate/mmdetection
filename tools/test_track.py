@@ -20,14 +20,13 @@ from mmdet.core import coco_eval, results2json, wrap_fp16_model
 from mmdet.datasets import build_dataloader, build_dataset
 from mmdet.models import build_detector
 from tools.voc_eval import voc_eval
-from mmdet.models.tracktor import resnet50
-from mmdet.models.tracktor import Tracker
+from mmdet.models.tracktor import resnet50, Tracker, Tracker_Low, plot_sequence
 from mmdet.models.tracktor import plot_sequence
 from tools.exec_time import Timer
 import cv2
 
-def single_gpu_test(model,data_loader,show=False, 
-                    tracktor_cfg=None,test_cfg=None):
+def single_gpu_test(model,data_loader,show, skip, single, 
+                    tracktor_cfg=None, test_cfg=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -38,24 +37,29 @@ def single_gpu_test(model,data_loader,show=False,
     reid_network.eval()
     reid_network.cuda()
 
-    tracker = Tracker(model, reid_network, tracktor_cfg.tracker, test_cfg)
+    proc_frame_rate = int(30/skip)
+    # if proc_frame_rate > 24:
+    #     tracker = Tracker(model, reid_network, tracktor_cfg.tracker, test_cfg, single)
+    #     print('IOU')
+    # else:
+    tracker = Tracker_Low(model, reid_network, tracktor_cfg.tracker, test_cfg, single)
+    print('ReId')
 
     for i, data in enumerate(data_loader):
-        # print()
-        # if i > 40:
-        tracker.step(data)
-        result = tracker.get_results()
-            # img_meta = data['img_meta'][0].data[0]
-            # img_name = str(img_meta[0]['filename'])
-            # img = cv2.imread(img_name)
-            # print(img_name, type(img_name))
-            # print('<------------------------------------->')
-            # cv2.imshow('blob', cv2.resize(img, (860,540)))
-            # k=cv2.waitKey(0) & 0xFF
-            # if k==27:
-            #     break
-            #     cv2.destroyAllWindows()
-        prog_bar.update()
+        if i % skip == 0:
+            tracker.step(data)
+            result = tracker.get_results()
+            img_meta = data['img_meta'][0].data[0]
+            img_name = str(img_meta[0]['filename'])
+            img = cv2.imread(img_name)
+            print(img_name, type(img_name))
+            print('<------------------------------------->')
+            cv2.imshow('blob', cv2.resize(img, (860,540)))
+            k=cv2.waitKey(0) & 0xFF
+            if k==27:
+                break
+                cv2.destroyAllWindows()
+            prog_bar.update()
     results = tracker.get_results()
     if tracktor_cfg.write_images:
         plot_sequence(results, data_loader, osp.join(tracktor_cfg.output_dir))
@@ -132,7 +136,8 @@ def parse_args():
     parser.add_argument('config', default='configs/faster_rcnn_r101_fpn_1x_mot.py', help='test config file path')
     parser.add_argument('checkpoint', default='checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth',help='checkpoint file')
     parser.add_argument('--out', default='results/results_track.pkl', help='output result file')
-    parser.add_argument('--double_stage', action='store_true', help='single/double (rcnn) stage detection')
+    parser.add_argument('--skip', type=int, default=1, help='fps/skip')  
+    parser.add_argument('--single', action='store_true', help='single/double(rcnn) stage detection')
     parser.add_argument(
         '--json_out',
         help='output result file name without extension',
@@ -209,12 +214,12 @@ def main():
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
 
-        outputs = single_gpu_test(model, data_loader, args.show, 
-                    tracktor_cfg=cfg.tracktor, test_cfg=cfg.test_cfg)
+        outputs = single_gpu_test(model, data_loader, args.show, args.skip,
+                    args.single, tracktor_cfg=cfg.tracktor, test_cfg=cfg.test_cfg)
     else:
         model = MMDistributedDataParallel(model.cuda())
-        outputs = multi_gpu_test(model, data_loader, args.tmpdir,
-                    tracktor_cfg=cfg.tracktor, test_cfg=cfg.test_cfg)
+        outputs = multi_gpu_test(model, data_loader, args.tmpdir, args.skip, 
+                    args.single, tracktor_cfg=cfg.tracktor, test_cfg=cfg.test_cfg)
 
     print(time.time()-start_time)
 if __name__ == '__main__':

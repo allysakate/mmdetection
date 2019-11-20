@@ -147,8 +147,8 @@ data = dict(
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'Camera1/camera1.pkl',
-        img_prefix=data_root + 'Camera1/images/',
+        ann_file='/media/allysakatebrillantes/MyPassport/DATASET/catchall-dataset/cvat/test/RESULT/test.pkl',
+        img_prefix='/media/allysakatebrillantes/MyPassport/DATASET/catchall-dataset/cvat/test/images/mmdet/',
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
@@ -179,17 +179,17 @@ resume_from = None
 workflow = [('train', 1)]
 
 tracktor = dict(
-    reid_weights='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/ResNet_iter_25245.pth',
-    reid_config='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/sacred_config.yaml',
+    reid_weights='mmdet/models/tracktor/siamese/train/ep25036/ResNet_iter_25036.pth',
+    reid_config='mmdet/models/tracktor/siamese/train/ep25036/sacred_config.yaml',
     interpolate=False,
     write_images=True,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
-    output_dir = '/media/allysakatebrillantes/MyPassport/DATASET/Tracking/FRCNN/tracker',
+    output_dir = '/media/allysakatebrillantes/MyPassport/DATASET/Tracking/FRCNN/tracker_ocr',
     tracker=dict(        
         detection_thresh=0.5,
         regression_thresh=0.5,           #score threshold for keeping the track alive
         detection_nms_thresh=0.5,        #NMS threshold for detection
         regression_nms_thresh=0.6,       # NMS theshold while tracking
-        motion_model=True,              # use a constant velocity assumption v_t = x_t - x_t-1
+        motion_model=False,              # use a constant velocity assumption v_t = x_t - x_t-1
         # DPM or DPM_RAW or 0, raw includes the unfiltered (no nms) versions of the provided detections,
         public_detections=True,          # 0 tells the tracker to use private detections (Faster R-CNN)
         max_features_num=10,             # How much last appearance features are to keep
@@ -197,10 +197,30 @@ tracktor = dict(
         warp_mode='cv2.MOTION_EUCLIDEAN',  # Which warp mode to use (cv2.MOTION_EUCLIDEAN, cv2.MOTION_AFFINE, ...)
         number_of_iterations=100,        # maximal number of iterations (original 50)
         termination_eps=0.00001,         # Threshold increment between two iterations (original 0.001)
-        do_reid=False,                    # Use siamese network to do reid
+#        do_reid=True,                    # Use siamese network to do reid
         inactive_patience=10,            # How much timesteps dead tracks are kept and cosidered for reid
-        reid_sim_threshold=2.0,          # How similar do image and old track need to be to be considered the same person
+        reid_sim_threshold=10.0,          # How similar do image and old track need to be to be considered the same person
         reid_iou_threshold=0.2,         # How much IoU do track and image need to be considered for matching
         img_scale = (1333, 800)
     )
 )        
+ocr = dict(
+    saved_model='mmdet/models/ocr/checkpoints/best_accuracy.pth',
+    imgH=32,
+    imgW=100,
+    batch_max_length=25,
+    rgb = False,
+    character='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#',
+    sensitive= True,
+    PAD= False,
+    Transformation=None,
+    FeatureExtraction='VGG',
+    SequenceModeling='BiLSTM',
+    Prediction='CTC',
+    num_fiducial=20,
+    input_channel=1,
+    output_channel=512,
+    hidden_size=256
+)
+
+#CUDA_VISIBLE_DEVICES=0 python3 demo.py --Transformation None --FeatureExtraction VGG --SequenceModeling BiLSTM --Prediction CTC --image_folder demo_image/ --saved_model checkpoints/best_accuracy.pth --sensitive

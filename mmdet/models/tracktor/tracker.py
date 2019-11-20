@@ -17,10 +17,9 @@ class Tracker():
 	"""The main tracking file, here is where magic happens."""
 	# only track pedestrian
 
-	def __init__(self, obj_detect, reid_network, tracker_cfg, test_cfg, rcnn=True):
+	def __init__(self, obj_detect, reid_network, tracker_cfg, test_cfg, single):
 		self.obj_detect = obj_detect
 		self.reid_network = reid_network
-		self.vid_framerate = 30
 		self.detection_thresh = tracker_cfg.detection_thresh
 		self.regression_thresh = tracker_cfg.regression_thresh
 		self.detection_nms_thresh = tracker_cfg.detection_nms_thresh
@@ -37,7 +36,7 @@ class Tracker():
 		self.warp_mode = eval(tracker_cfg.warp_mode)
 		self.number_of_iterations = tracker_cfg.number_of_iterations
 		self.termination_eps = tracker_cfg.termination_eps
-		if rcnn:
+		if not single:
 			self.nms_cfg = test_cfg.rcnn.nms
 		else:
 			self.nms_cfg = test_cfg.nms
@@ -50,6 +49,7 @@ class Tracker():
 		print(f'Reset')
 		self.tracks = []
 		self.inactive_tracks = []
+		self.reid_tracks = []
 
 		if hard:
 			self.track_num = 0
@@ -236,7 +236,7 @@ class Tracker():
 			for r,c in zip(row_ind, col_ind):
 				if dist_mat[r,c] <= self.reid_sim_threshold:
 					t = self.inactive_tracks[r]
-					self.tracks.append(t)
+					self.reid_tracks.append(t)
 					t.count_inactive = 0
 					t.last_v = torch.Tensor([])
 					t.pos = new_det_pos[c].view(1,-1)

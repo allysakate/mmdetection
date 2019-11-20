@@ -10,24 +10,22 @@ from torch.autograd import Variable
 
 import cv2
 from mmdet.ops.nms import nms_wrapper
+from mmdet.models.ocr import get_text
 
 from .utils import bbox_overlaps, bbox_transform_inv, clip_boxes
 
-class Tracker():
+class Tracker_Low():
 	"""The main tracking file, here is where magic happens."""
-	# only track pedestrian
 
-	def __init__(self, obj_detect, reid_network, tracker_cfg, test_cfg, rcnn=True):
+	def __init__(self, obj_detect, reid_network, tracker_cfg, test_cfg, single):
 		self.obj_detect = obj_detect
 		self.reid_network = reid_network
-		self.vid_framerate = 30
 		self.detection_thresh = tracker_cfg.detection_thresh
 		self.regression_thresh = tracker_cfg.regression_thresh
 		self.detection_nms_thresh = tracker_cfg.detection_nms_thresh
 		self.regression_nms_thresh = tracker_cfg.regression_nms_thresh
 		self.public_detections = tracker_cfg.public_detections
 		self.inactive_patience = tracker_cfg.inactive_patience
-		self.do_reid = tracker_cfg.do_reid
 		self.max_features_num = tracker_cfg.max_features_num
 		self.reid_sim_threshold = tracker_cfg.reid_sim_threshold
 		self.reid_iou_threshold = tracker_cfg.reid_iou_threshold
@@ -37,7 +35,7 @@ class Tracker():
 		self.warp_mode = eval(tracker_cfg.warp_mode)
 		self.number_of_iterations = tracker_cfg.number_of_iterations
 		self.termination_eps = tracker_cfg.termination_eps
-		if rcnn:
+		if not single:
 			self.nms_cfg = test_cfg.rcnn.nms
 		else:
 			self.nms_cfg = test_cfg.nms
@@ -64,89 +62,47 @@ class Tracker():
 			print(f'Tracks_to_Inactive: id={t.id} | pos={t.pos} ')
 		self.inactive_tracks += tracks
 
-	def add_lowframe(self, new_det_pos, new_det_scores, new_det_features, new_det_labels):
+	def add_lowframe(self, img, new_det_pos, new_det_scores, new_det_features, new_det_labels, ocr_model, cfg_ocr, ocr_converter):
 		"""Initializes new Track objects and saves them for lowframe."""
 		num_new = new_det_pos.size(0)
 		for i in range(num_new):
-			#pos, score, label, track_id, features, inactive_patience, max_features_num):
-			track_input = Track(new_det_pos[i].view(1,-1), new_det_scores[i], new_det_labels[i], self.track_num + i, new_det_features[i].view(1,-1),
-																	self.inactive_patience, self.max_features_num)
+			bbox = new_det_pos[i].view(1,-1)[0]
+			if bbox[1] > 450:
+				plate_string= self.get_ocr(img, bbox, ocr_model, cfg_ocr, ocr_converter)
+			else:
+				plate_string = "None"
+			track_input = Track_Low(new_det_pos[i].view(1,-1), new_det_scores[i], new_det_labels[i], self.track_num + i, plate_string,
+												new_det_features[i].view(1,-1),self.inactive_patience, self.max_features_num)
 			self.tracks.append(track_input)
 		self.track_num += num_new
 		#print(f'LOW_add_num_new: {track_input}')
 
-	def add_highframe(self, new_det_pos, new_det_scores, new_det_labels):
-		"""Initializes new Track objects and saves them for highframe."""
-		num_new = new_det_pos.size(0)
-		for i in range(num_new):
-			#pos, score, label, track_id, features, inactive_patience, max_features_num):
-			track_label = new_det_labels[i]
-			if isinstance(track_label, int):
-				track_label = torch.tensor([track_label]).cuda()
-				
-			track_input = Track(new_det_pos[i].view(1,-1), new_det_scores[i], track_label, self.track_num + i, None,
-																	self.inactive_patience, None)
-			self.tracks.append(track_input)
-		self.track_num += num_new
-		#print(f'HIGH_add_num_new: {track_input.pos} | {track_input.label}')
-
-	def regress_tracks(self, blob):
-		"""Regress the position of the tracks and also checks their scores."""
-		print(f'REGRESS TRACKS')
-		reg_score = True
-		pos, lbl = self.get_pos()
-		# regress
-		with torch.no_grad():
-			pred_bbox_score, pred_labels = self.obj_detect(return_loss=False, proposals=pos, track=True, regress=True, **blob)
-		pred_scores = pred_bbox_score[:, 4]
-		pos_idx     = torch.gt(pred_scores,self.detection_thresh).nonzero().view(-1)
-		pred_scores = pred_scores[pos_idx]
-		pred_bboxes = pred_bbox_score[:,:4]
-		pred_bboxes = pred_bboxes[pos_idx]
-		pred_labels = pred_labels[pos_idx]
-		print(f'Prediction: Bbox={pred_bboxes} \n \t Score={pred_scores} \n  \t Label={pred_labels}')
-		s = []
-		pred_len = len(pred_bboxes)
-		track_len = len(self.tracks)
-		if track_len >= pred_len:
-			range_len = track_len
-		else:
-			range_len = pred_len
-		for i in range(track_len-1,-1,-1):
-			#print(f'i: {i} | {len(self.tracks)-1,-1,-1}')
-			try:
-				t = self.tracks[i]
-				t.score = pred_scores[i]
-				if t.score <= self.regression_thresh:
-					self.tracks_to_inactive([t])
-					print(f'Regression To Inactive: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label}')
-				else:
-					s.append(t.score)
-					t.pos = pred_bboxes[i].view(1,-1)
-					t.label = torch.tensor(pred_labels[i]).cuda()
-				print(f'Regression MultiClass: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label} \n')
-			except:
-				t = self.tracks[i]
-				self.tracks_to_inactive([t])
-				print(f'ERROR: Reg To Inactive: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label}')
-	
-		return torch.Tensor(s[::-1]).cuda()
-
-	def get_pos(self):
+	def get_active_tracks(self):
 		"""Get the positions of all active tracks."""
 		if len(self.tracks) == 1:
 			pos = [self.tracks[0].pos]
-			lbl = [self.tracks[0].label]
+			sc  = [self.tracks[0].score]
+			lbl = [self.tracks[0].label.cuda()]
 		elif len(self.tracks) > 1:
-			pos = torch.stack([t.pos for t in self.tracks])
+			pos = []
+			sc  = []
+			lbl = []
 			for t in self.tracks:
-				print(t.label)
-			lbl = torch.stack([t.label for t in self.tracks])
+				p = t.pos.tolist()
+				pos.append(p[0])
+				s = t.score
+				sc.append(s[0])
+				l = t.label
+				lbl.append(l)
+			lbl = torch.tensor(lbl).cuda()
+			pos = torch.tensor(pos)
+			sc = torch.tensor(sc)
 		else:
 			pos = torch.zeros(0).cuda()
-			lbl = torch.tensor([0])
+			sc  = torch.tensor([0]).cuda()
+			lbl = torch.tensor([0]).cuda()
 		print(f'Get Pos: Bbox={pos} \n \t Label={lbl}')
-		return pos, lbl
+		return pos, sc, lbl
 
 	def get_features(self):
 		"""Get the features of all active tracks."""
@@ -168,17 +124,85 @@ class Tracker():
 			features = torch.zeros(0).cuda()
 		return features
 
-	def reid(self, blob, new_det_pos, new_det_scores, new_det_labels):
-		"""Tries to ReID inactive tracks with provided detections."""
+	def regress_tracks(self, blob):
+		"""Regress the position of the tracks and also checks their scores."""
+		print(f'REGRESS TRACKS')
+		reg_score = True
+		pos, lbl = self.get_active_tracks()
+		# regress
+		with torch.no_grad():
+			bboxes, scores = self.obj_detect(return_loss=False, proposals=pos, track=True, regress=True, **blob)
 
-		img_meta = blob['img_meta'][0].data[0]
-		new_det_features = self.reid_network.test_rois(img_meta[0]['reid_img'], new_det_pos / img_meta[0]['scale_factor']).data		
-		if len(self.inactive_tracks) >= 1 and self.do_reid:
+		base_label = torch.ones((list(scores.shape)[0],4),dtype=int)
+		label_index = torch.tensor((1,2,3,4),dtype=int)
+		labels = base_label * label_index
+
+		score_list = []
+		label_list = []
+		bbox_list = []
+		s = []
+		for i in range(scores.size(0)):
+			cls_inds = scores[i][1:5] > self.detection_thresh
+			if not cls_inds.any():
+				continue
+			cls_score=scores[i][1:5][cls_inds].tolist()
+			score_list.append(cls_score[0])
+
+			cls_label=labels[i][cls_inds].tolist()
+			label_list.append(cls_label[0])
+
+			cls_box = []
+			for b in range(1,self.cl):
+				box = bboxes[i][b*4:(b+1)*4].tolist()
+				cls_box.append(box)
+			cls_box = torch.tensor(cls_box)[cls_inds].tolist()
+			bbox_list.append(cls_box[0])  
+
+		cls_scores = torch.tensor(score_list).cuda()
+		cls_labels = torch.tensor(label_list).cuda()
+		cls_bboxes = torch.tensor(bbox_list).cuda()
+
+		print(f'Prediction: Bbox={cls_bboxes} \n \t Score={cls_scores} \n  \t Label={cls_labels}')
+	
+		return cls_bboxes, cls_scores, cls_labels
+
+	def get_ocr(self, img, bbox, ocr_model, cfg_ocr, ocr_converter):
+		"""Initializes new Track objects and saves them for lowframe."""
+		x_min = int(bbox[0])
+		y_min = int(bbox[1])
+		x_max = int(bbox[2])
+		y_max = int(bbox[3])
+		plate_img = img[y_min:y_max,x_min:x_max] 
+		plate_string = get_text(plate_img, ocr_model, cfg_ocr, ocr_converter)
+		if len(plate_string) == 0:
+			plate_string = 'NAN'
+		return plate_string
+
+
+	def reid(self, blob, frame, new_det_pos, new_det_scores, new_det_labels, do_reid, ocr_model, cfg_ocr, ocr_converter):
+		"""Tries to ReID with provided detections."""
+
+		img_meta     = blob['img_meta'][0]
+		scale_factor = img_meta[0]['scale_factor']
+		new_det_features = self.reid_network.test_rois(img_meta[0]['reid_img'], new_det_pos/scale_factor).data		
+	
+		if do_reid:
 			# calculate appearance distances
-			dist_mat = []
+			dist_mat  = []
 			pos = []
-			for t in self.inactive_tracks:
-				dist_mat.append(torch.cat([t.test_features(feat.view(1,-1)) for feat in new_det_features], 1))
+			num_track = 0
+			track_list = []
+			for t in self.tracks:
+				track_list.append(num_track)
+				num_track += 1
+				print(f'New_Feat={new_det_features.size(0)}')
+				if new_det_features.size(0) == 1:
+					for feat in new_det_features:
+						dist = t.test_features(feat.view(1,-1))
+						dist_mat.append(dist)
+				else:
+					dist_mat.append(torch.cat([t.test_features(feat.view(1,-1)) for feat in new_det_features], 0))
+					print(f'dist_mat: {dist_mat}')
 				pos.append(t.pos)
 			if len(dist_mat) > 1:
 				dist_mat = torch.cat(dist_mat, 0)
@@ -186,32 +210,64 @@ class Tracker():
 			else:
 				dist_mat = dist_mat[0]
 				pos = pos[0]
+			print(f'Dist_mat={dist_mat} \n \t pos={pos}')
 
 			# calculate IoU distances
 			iou = bbox_overlaps(pos, new_det_pos)
 			iou_mask = torch.ge(iou, self.reid_iou_threshold)
 			iou_neg_mask = ~iou_mask
+			print(f'iou={iou} \n \t mask={iou_mask} \n \t neg_mask={iou_neg_mask}')
 			# make all impossible assignemnts to the same add big value
-			dist_mat = dist_mat * iou_mask.float() + iou_neg_mask.float()*1000
+			try:
+				dist_mat = dist_mat * iou_mask.float() + iou_neg_mask.float()*1000
+			except:
+				mat_shape = iou_mask.size()
+				dist_mat = dist_mat.resize_(mat_shape) * iou_mask.float() + iou_neg_mask.float()*1000
 			dist_mat = dist_mat.cpu().numpy()
+			print(f'dist_mat={dist_mat}')
 
 			row_ind, col_ind = linear_sum_assignment(dist_mat)
-
+			print(len(col_ind))
 			assigned = []
-			remove_inactive = []
+			row_list = []
+			inactive = []
 			for r,c in zip(row_ind, col_ind):
+				print(f'r={r} \t c={c}')
+				print(f'dist_mat: {dist_mat[r,c]}')
+				row_list.append(r)
+			if len(col_ind) == len(self.tracks):
+				idx_R = True
+			else:
+				idx_R = False
+			less_Track = False
+			for r,c in zip(row_ind, col_ind):
+				if idx_R:
+					idx = r
+					print(f'R={idx}')
+				else:
+					idx = c
+					print(f'C={idx}')
+					inactive = list(set(track_list)-set(row_list))
 				if dist_mat[r,c] <= self.reid_sim_threshold:
-					t = self.inactive_tracks[r]
-					self.tracks.append(t)
-					t.count_inactive = 0
-					t.last_v = torch.Tensor([])
-					t.pos = new_det_pos[c].view(1,-1)
-					t.add_features(new_det_features[c].view(1,-1))
-					assigned.append(c)
-					remove_inactive.append(t)
-
-			for t in remove_inactive:
-				self.inactive_tracks.remove(t)
+					t = self.tracks[r]
+					t.pos = new_det_pos[idx].view(1,-1)
+					print(t.pos, t.pos[0][1])
+					if t.pos[0][1] > 450:
+						t.ocr = self.get_ocr(frame, t.pos[0], ocr_model, cfg_ocr, ocr_converter)
+					t.score = new_det_scores[idx]
+					t.label = new_det_labels[idx]
+					t.add_features(new_det_features[idx].view(1,-1))
+					assigned.append(idx)
+				else:
+					inactive.append(idx)
+			print(f'Active: {assigned} /n Inactive: {inactive}')
+			if len(inactive) > 1:
+				inactive = sorted(inactive, reverse=True)
+			for i in inactive:
+				print(i)
+				t = self.tracks[i]
+				self.tracks_to_inactive([t])
+				print(f'Regression To Inactive: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label}')
 
 			keep = torch.Tensor([i for i in range(new_det_pos.size(0)) if i not in assigned]).long().cuda()
 			if keep.nelement() > 0:
@@ -222,6 +278,7 @@ class Tracker():
 				new_det_pos = torch.zeros(0).cuda()
 				new_det_scores = torch.zeros(0).cuda()
 				new_det_features = torch.zeros(0).cuda()
+		print(f'reid: pos: {new_det_pos} \n sc: {new_det_scores} \n lbl: {new_det_labels}')
 		return new_det_pos, new_det_scores, new_det_features, new_det_labels
 
 	def clear_inactive(self):
@@ -235,15 +292,13 @@ class Tracker():
 			self.inactive_tracks.remove(t)
 		print(f'Clear Inactive: {to_remove}')
 		
-		
-
 	def get_appearances(self, blob):
 		"""Uses the siamese CNN to get the features for all active tracks."""
 		print(f'Get Appearances')
-		img_meta = blob['img_meta'][0].data[0]
+		img_meta = blob['img_meta'][0]
 		reid_img = img_meta[0]['reid_img']
 		scale_factor = img_meta[0]['scale_factor']
-		pos, lbl = self.get_pos()
+		pos, sc, lbl = self.get_active_tracks()
 		new_features = self.reid_network.test_rois(reid_img, pos[0] / scale_factor).data
 		return new_features
 
@@ -256,7 +311,7 @@ class Tracker():
 		"""Aligns the positions of active and inactive tracks depending on camera motion."""
 		if self.im_index > 0:
 			im1 = self.last_image.cpu().numpy().transpose(1, 2, 0)
-			im2 = blob['img'][0].data[0].cpu().numpy().transpose(1, 2, 0)
+			im2 = blob['img'][0].cpu().numpy().transpose(1, 2, 0)
 			im1_gray = cv2.cvtColor(im1,cv2.COLOR_BGR2GRAY)
 			im2_gray = cv2.cvtColor(im2,cv2.COLOR_BGR2GRAY)
 			sz = im1.shape
@@ -361,7 +416,7 @@ class Tracker():
 					t.pos[0,2] = cxp_new + wp/2
 					t.pos[0,3] = cyp_new + hp/2
 
-	def step(self, blob):
+	def step(self, blob, frame, ocr_model, cfg_ocr, ocr_converter):
 		"""This function should be called every timestep to perform tracking with a blob
 		containing the image information.
 		Input:
@@ -376,151 +431,55 @@ class Tracker():
 		'reid_img': array(..)
 		"""
 		print(f'DETECTIONS')
-		for t in self.tracks:
-			t.last_pos = t.pos.clone()
-			print(f'Last Get Pos: {t.last_pos}')
+		# for t in self.tracks:
+		# 	t.last_pos = t.pos.clone()
+		# 	print(f'Last Get Pos: {t.last_pos}')
 		
 		###########################
 		# Look for new detections #
 		###########################
 		with torch.no_grad():
 			det_bboxes, det_labels = self.obj_detect(return_loss=False, track=True, regress=False, **blob)
-
-		print(f'Detection: Bbox: {det_bboxes} \n \t Labels {det_labels}')
+			det_scores = det_bboxes[:, 4]
+			det_bboxes = det_bboxes[:,:4]
+		print(f'Detection: Bbox={det_bboxes} \n \t Score={det_scores} \n \t Labels {det_labels}')
 
 		##################
 		# Predict tracks #
 		##################
-		num_tracks = 0
-		nms_inp_reg = torch.zeros(0).cuda()
+		# num_tracks = 0
+		# nms_inp_reg = torch.zeros(0).cuda()
 		print(f'Track Length: {len(self.tracks)} \n')
-		if len(self.tracks):
-			# align
-			if self.do_align:
-				self.align(blob)
-			# apply motion model
-			if self.motion_model:
-				self.motion()
-			#regress
-			regress_scores = self.regress_tracks(blob)
-			#print(f'regress_scores: {regress_scores}')
-
-			if len(self.tracks):
-
-				# create nms input
+		# align
+		if self.do_align:
+			self.align(blob)
+		# apply motion model
+		if self.motion_model:
+			self.motion()
+							# create nms input
 				# new_features = self.get_appearances(blob)
-
 				# nms here if tracks overlap
-				print('TRACKS OVERLAP')
-				predict_bbox, predict_label = self.get_pos()
-				#print(f'inp_reg: {predict_bbox} | {regress_scores} | {regress_scores.view(-1,1)}')
-				if len(predict_bbox) == 1: 
-					nms_inp_reg = torch.cat((predict_bbox[0], regress_scores.add_(3).view(-1 ,1)), 1)
-				else:
-					predict_bbox = torch.tensor(predict_bbox.squeeze().tolist()).add_(3).cuda()
-					nms_inp_reg = torch.cat((predict_bbox, regress_scores.view(-1,1)), 1)
-				nms_type = self.nms_cfg.pop('type', 'nms')
-				nms_op = getattr(nms_wrapper, nms_type)
-				keep = nms_op(nms_inp_reg, self.regression_nms_thresh)
-				print(f'Tracks to Keep: {keep}')
-				self.tracks_to_inactive([self.tracks[i]
-				                         for i in list(range(len(self.tracks)))
-				                         if i not in keep[1]])
-
-				if keep[1].nelement() > 0:
-					predict_bbox, predict_label = self.get_pos()
-					if len(predict_bbox) == 1: 
-						nms_inp_reg = torch.cat((predict_bbox[0], torch.ones(predict_bbox[0].size(0)).add_(3).view(-1,1).cuda()),1)
-						predict_label = torch.tensor(predict_label).cuda()
-					else:
-						predict_bbox = torch.tensor(predict_bbox.squeeze().tolist()).cuda()
-						predict_label = torch.tensor(predict_label.squeeze().tolist()).cuda()
-						nms_inp_reg = torch.cat((predict_bbox, torch.ones(predict_bbox.size(0)).add_(3).view(-1,1).cuda()),1)
-					
-					if self.vid_framerate < 24:
-						new_features = self.get_appearances(blob)
-						self.add_features(new_features)
-					else:
-						num_tracks = nms_inp_reg.size(0)
-				else:
-					nms_inp_reg = torch.zeros(0).cuda()
-					num_tracks = 0
-					
-				print(f'Concat: Bbox={nms_inp_reg} \n \t Label={predict_label} \n')
-
-		#####################
-		# Create new tracks #
-		#####################
-
-		# !!! Here NMS is used to filter out detections that are already covered by tracks. This is
-		# !!! done by iterating through the active tracks one by one, assigning them a bigger score
-		# !!! than 1 (maximum score for detections) and then filtering the detections with NMS.
-		# !!! In the paper this is done by calculating the overlap with existing tracks, but the
-		# !!! result stays the same.
-		print('CREATE NEW TRACKS')
 		if det_bboxes.nelement() > 0:
-			new_track_bbox  = det_bboxes
-			new_track_label = det_labels
+			new_det_pos    = det_bboxes
+			new_det_scores = det_scores
+			new_det_labels = det_labels
 		else:
-			new_track_bbox = torch.zeros(0).cuda()
-			new_track_label  = torch.zeros(0).cuda()
-
-		#print(f'new_track_bbox: {new_track_bbox, new_track_label}')
-
-		if new_track_bbox.nelement() > 0:
-			nms_type = self.nms_cfg.pop('type', 'nms')
-			nms_op = getattr(nms_wrapper, nms_type)
-			keep = nms_op(new_track_bbox, self.detection_nms_thresh)[1]
-			#print(f'new_track_nms: {nms_type,nms_op} \n {nms_op(new_track_bbox, self.detection_nms_thresh)} \n {keep}')
-			new_track_bbox = new_track_bbox[keep]
-			new_track_label = new_track_label[keep]
-			print(f'To Keep: Bbox={new_track_bbox} \n \t Label to Keep={new_track_label}')
-			
-			# check with every track in a single run (problem if tracks delete each other)
-			#print(f'num_tracks = {num_tracks}')
-			for i in range(num_tracks):
-				nms_pos = torch.cat((nms_inp_reg[i].view(1,-1), new_track_bbox), 0)
-				nms_lbl = torch.cat((predict_label[i].view(1), new_track_label))
-				#print(f'nms_inp[i]:{i} | {nms_pos} | {nms_lbl}')
-				nms_keep = nms_op(nms_pos, self.detection_nms_thresh)
-				print(f'Reg-Det To Keep: {nms_keep}')
-				try:
-					scores_keep = nms_keep[0][:, 4]
-					keep = torch.ge(scores_keep)
-				except:
-					keep = nms_keep[1]
-					keep = keep[torch.ge(keep,1)]
-				print(f'Filter: {keep}')
-				if keep.nelement() == 0:
-					new_track_bbox = new_track_bbox.new(0)
-					new_track_label = new_track_label.new(0)
-					break
-				new_track_bbox = nms_pos[keep]
-				new_track_label= nms_lbl[keep]
-				#print(f'new_track: {new_track_bbox} | {new_track_label}')
-
-		if new_track_bbox.nelement() > 0:
-			new_det_pos    = new_track_bbox[:,:4]
-			new_det_scores = new_track_bbox[:, 4]
-			new_det_labels = new_track_label
+			new_det_pos    = torch.zeros(0).cuda()
+			new_det_scores = torch.zeros(0).cuda()
+			new_det_labels = torch.zeros(0).cuda()		
 		
-			print(f'New Pos: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
+		if len(self.tracks):
+			print('Do Reid')
+			do_reid = True
+		else:
+			do_reid = False
+		if new_det_pos.nelement() > 0: 
+			new_det_pos, new_det_scores, new_det_features, new_det_labels = self.reid(blob, frame, new_det_pos, new_det_scores, new_det_labels, do_reid, ocr_model, cfg_ocr, ocr_converter)
+			print(f'New: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
 
-			# try to redientify tracks
-			if self.vid_framerate < 24:
-				new_det_pos, new_det_scores, new_det_features, new_det_labels = self.reid(blob, new_det_pos, new_det_scores, new_det_labels)
-				print(f'reid: {new_det_pos} | {new_det_scores}')
-
-	
-			# add new
-			# if new_det_pos.nelement() > 0:
-			# 	self.add(new_det_pos, new_det_scores, new_det_features, new_det_labels)
-			
-			if new_det_pos.nelement() > 0:
-				if self.vid_framerate < 24:
-					self.add_lowframe(new_det_pos, new_det_scores, new_det_features, new_det_labels)
-				else:
-					self.add_highframe(new_det_pos, new_det_scores, new_det_labels)
+		print('CREATE NEW TRACKS')
+		if new_det_pos.nelement() > 0:
+			self.add_lowframe(frame, new_det_pos, new_det_scores, new_det_features, new_det_labels, ocr_model, cfg_ocr, ocr_converter)
 
 		####################
 		# Generate Results #
@@ -530,7 +489,7 @@ class Tracker():
 			track_ind = int(t.id)
 			if track_ind not in self.results.keys():
 				self.results[track_ind] = {}
-			img_meta = blob['img_meta'][0].data[0]
+			img_meta = blob['img_meta'][0]
 			scale_factor = img_meta[0]['scale_factor']
 			try:
 				pos = t.pos[0] / scale_factor
@@ -538,11 +497,12 @@ class Tracker():
 				pos = t.pos[0] / t.pos[0].new_tensor(scale_factor)
 			sc = t.score
 			lb = t.label
-			print(f'Tracks: Index={track_ind} \n \t Pos={pos} \n \t label={lb} ')
-			self.results[track_ind][self.im_index] = np.concatenate([pos.cpu().numpy(), np.array([sc]), np.array([lb])])
+			ocr = t.ocr
+			print(f'Tracks: Index={track_ind} \n \t Pos={pos} \n \t label={lb}  \n \t label={ocr} ')
+			self.results[track_ind][self.im_index] = np.concatenate([pos.cpu().numpy(), np.array([sc]), np.array([lb]),  np.array([ocr])])
 
 		self.im_index += 1
-		self.last_image = blob['img'][0].data[0]
+		self.last_image = blob['img'][0]
 	#	print(f'last image: {self.last_image}')
 
 		self.clear_inactive()
@@ -550,14 +510,15 @@ class Tracker():
 	def get_results(self):
 		return self.results
 
-class Track(object):
+class Track_Low(object):
 	"""This class contains all necessary for every individual track."""
 
-	def __init__(self, pos, score, label, track_id, features, inactive_patience, max_features_num):
+	def __init__(self, pos, score, label, track_id, ocr, features, inactive_patience, max_features_num):
 		self.id = track_id
 		self.pos = pos
 		self.score = score
 		self.label = label
+		self.ocr = ocr
 		self.features = deque([features])
 		self.ims = deque([])
 		self.count_inactive = 0
@@ -585,9 +546,11 @@ class Track(object):
 
 	def test_features(self, test_features):
 		"""Compares test_features to features of this Track object"""
-		print('Test Features')
+		print(f'Test Features')
+		feat_list = []
 		if len(self.features) > 1:
-			features = torch.cat(self.features, 0)
+			feat_list = list(self.features)
+			features = torch.cat(feat_list, 0)
 		else:
 			features = self.features[0]
 		features = features.mean(0, keepdim=True)

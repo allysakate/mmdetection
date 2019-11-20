@@ -129,3 +129,6 @@ results/*.pkl
 #build from cfg
 build_from_cfg/
 results/
+**/*.jpg
+**/*.pth
+mmdet/models/tracktor/siamese/

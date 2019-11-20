@@ -7,10 +7,12 @@ import pycocotools.mask as maskUtils
 import torch
 from mmcv.parallel import collate, scatter
 from mmcv.runner import load_checkpoint
-
 from mmdet.core import get_classes
 from mmdet.datasets.pipelines import Compose
 from mmdet.models import build_detector
+from cycler import cycler as cy
+from collections import defaultdict
+import cv2
 
 
 def init_detector(config, checkpoint=None, device='cuda:0'):
@@ -57,6 +59,7 @@ class LoadImage(object):
         results['img'] = img
         results['img_shape'] = img.shape
         results['ori_shape'] = img.shape
+        results['reid_img']  = img
         return results
 
 
@@ -147,6 +150,50 @@ def show_result(img,
     if not (show or out_file):
         return img
 
+def show_tracks_result(img,
+                tracks,
+                class_names,
+                frame_cnt
+                ):
+    """Visualize the tracking results on the image.
+
+    Args:
+        img (str or np.ndarray): Image filename or loaded image.
+        result (tuple[list] or list): The detection result, can be either
+            (bbox, segm) or just bbox.
+        class_names (list[str] or tuple[str]): A list of class names.
+        score_thr (float): The threshold to visualize the bboxes and masks.
+        wait_time (int): Value of waitKey param.
+        show (bool, optional): Whether to show the image with opencv or not.
+        out_file (str, optional): If specified, the visualization result will
+            be written to the out file instead of shown in a window.
+
+    Returns:
+        np.ndarray or None: If neither `show` nor `out_file` is specified, the
+            visualized image is returned, otherwise None is returned.
+    """
+    colors = [(0, 0, 255),(0, 255, 0),(255, 0, 0),(255, 255, 0),(0, 255, 255),(255, 0, 255),(255, 255, 255),(0, 0, 0)]
+
+    img = mmcv.imread(img)
+    img = img.copy()
+    for t_id,t in tracks.items():
+        plate_color = colors[t_id % 8]
+        if frame_cnt in t.keys():
+            t_i = t[frame_cnt]
+            x_min = int(t_i[0])
+            y_min = int(t_i[1])
+            x_max = int(t_i[2])
+            y_max = int(t_i[3])
+            left_top = (x_min, y_min)
+            right_bottom = (x_max, y_max)
+            cv2.rectangle(img, left_top, right_bottom, plate_color, 3)
+            try:
+                plate_class = class_names[t_i[5]]
+            except:
+                plate_class = t_i[5]
+            label_text =  f'{t_id}_{plate_class}_{t_i[6]}' 
+            cv2.putText(img, label_text, (x_min, y_min - 2),cv2.FONT_HERSHEY_COMPLEX, 1, plate_color)
+    return img
 
 def show_result_pyplot(img,
                        result,
