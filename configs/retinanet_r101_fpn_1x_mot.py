@@ -49,7 +49,7 @@ train_cfg = dict(
 test_cfg = dict(
     nms_pre=1000,
     min_bbox_size=0,
-    score_thr=0.05,
+    score_thr=0.5,
     nms=dict(type='nms', iou_thr=0.5),
     max_per_img=100)
 # dataset settings
@@ -97,8 +97,8 @@ data = dict(
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'Camera1/camera1.pkl',
-        img_prefix=data_root + 'Camera1/images/',
+        ann_file='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/GT/Camera1/Detection/camera1.pkl',
+        img_prefix='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/GT/Camera1/Detection/images/',
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
@@ -129,9 +129,15 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 
+skip = 1
+show = False
+single = True
+checkpoint = 'checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth'
+video_name = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/ch01_07-12_10.35-1.mp4'
+
 tracktor = dict(
-    reid_weights='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/ResNet_iter_25245.pth',
-    reid_config='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/sacred_config.yaml',
+    reid_weights='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/ResNet_iter_25036.pth',
+    reid_config='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/sacred_config.yaml',
     interpolate=False,
     write_images=False,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
     output_dir = 'results/tracker',

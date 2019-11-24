@@ -11,6 +11,7 @@ from torch.autograd import Variable
 import cv2
 from mmdet.ops.nms import nms_wrapper
 from mmdet.models.ocr import get_text
+import time
 
 from .utils import bbox_overlaps, bbox_transform_inv, clip_boxes
 
@@ -31,7 +32,7 @@ class Tracker_Low():
 		self.reid_iou_threshold = tracker_cfg.reid_iou_threshold
 		self.do_align = tracker_cfg.do_align
 		self.motion_model = tracker_cfg.motion_model
-
+		self.do_reid = tracker_cfg.previous_reid
 		self.warp_mode = eval(tracker_cfg.warp_mode)
 		self.number_of_iterations = tracker_cfg.number_of_iterations
 		self.termination_eps = tracker_cfg.termination_eps
@@ -41,11 +42,12 @@ class Tracker_Low():
 			self.nms_cfg = test_cfg.nms
 		self.img_scale = tracker_cfg.img_scale
 		self.cl = 5
+		self.scale_factor = 0
 
 		self.reset()
 
 	def reset(self, hard=True):
-		print(f'Reset')
+		#print(f'Reset')
 		self.tracks = []
 		self.inactive_tracks = []
 
@@ -59,23 +61,34 @@ class Tracker_Low():
 		self.tracks = [t for t in self.tracks if t not in tracks]
 		for t in tracks:
 			t.pos = t.last_pos
-			print(f'Tracks_to_Inactive: id={t.id} | pos={t.pos} ')
+			#print(f'Tracks_to_Inactive: id={t.id} | pos={t.pos} ')
 		self.inactive_tracks += tracks
 
-	def add_lowframe(self, img, new_det_pos, new_det_scores, new_det_features, new_det_labels, ocr_model, cfg_ocr, ocr_converter):
+	def add_lowframe(self, img, scale_factor, new_det_pos, new_det_scores, new_det_features, new_det_labels, ocr_model, cfg_ocr, ocr_converter):
 		"""Initializes new Track objects and saves them for lowframe."""
 		num_new = new_det_pos.size(0)
 		for i in range(num_new):
 			bbox = new_det_pos[i].view(1,-1)[0]
-			if bbox[1] > 450:
-				plate_string= self.get_ocr(img, bbox, ocr_model, cfg_ocr, ocr_converter)
+			width = bbox[2]-bbox[0]
+			height = bbox[3]-bbox[1]
+			if width/height > 2:
+				valid = True
 			else:
-				plate_string = "None"
-			track_input = Track_Low(new_det_pos[i].view(1,-1), new_det_scores[i], new_det_labels[i], self.track_num + i, plate_string,
+				valid = False
+			# if bbox[1] > 450:
+			plate_string, ocr_time = self.get_ocr(img, bbox, ocr_model, cfg_ocr, ocr_converter)
+			self.ocr_time += ocr_time
+			# 	if len(plate_string) < 6:
+			# 			plate_string = "None" 
+			# else:
+			# 	plate_string = "None"
+			if valid:
+				track_input = Track(new_det_pos[i].view(1,-1), new_det_scores[i], new_det_labels[i], self.track_num + i, plate_string,
 												new_det_features[i].view(1,-1),self.inactive_patience, self.max_features_num)
-			self.tracks.append(track_input)
+				self.tracks.append(track_input)
+			else:
+				num_new -= 1
 		self.track_num += num_new
-		#print(f'LOW_add_num_new: {track_input}')
 
 	def get_active_tracks(self):
 		"""Get the positions of all active tracks."""
@@ -124,50 +137,9 @@ class Tracker_Low():
 			features = torch.zeros(0).cuda()
 		return features
 
-	def regress_tracks(self, blob):
-		"""Regress the position of the tracks and also checks their scores."""
-		print(f'REGRESS TRACKS')
-		reg_score = True
-		pos, lbl = self.get_active_tracks()
-		# regress
-		with torch.no_grad():
-			bboxes, scores = self.obj_detect(return_loss=False, proposals=pos, track=True, regress=True, **blob)
-
-		base_label = torch.ones((list(scores.shape)[0],4),dtype=int)
-		label_index = torch.tensor((1,2,3,4),dtype=int)
-		labels = base_label * label_index
-
-		score_list = []
-		label_list = []
-		bbox_list = []
-		s = []
-		for i in range(scores.size(0)):
-			cls_inds = scores[i][1:5] > self.detection_thresh
-			if not cls_inds.any():
-				continue
-			cls_score=scores[i][1:5][cls_inds].tolist()
-			score_list.append(cls_score[0])
-
-			cls_label=labels[i][cls_inds].tolist()
-			label_list.append(cls_label[0])
-
-			cls_box = []
-			for b in range(1,self.cl):
-				box = bboxes[i][b*4:(b+1)*4].tolist()
-				cls_box.append(box)
-			cls_box = torch.tensor(cls_box)[cls_inds].tolist()
-			bbox_list.append(cls_box[0])  
-
-		cls_scores = torch.tensor(score_list).cuda()
-		cls_labels = torch.tensor(label_list).cuda()
-		cls_bboxes = torch.tensor(bbox_list).cuda()
-
-		print(f'Prediction: Bbox={cls_bboxes} \n \t Score={cls_scores} \n  \t Label={cls_labels}')
-	
-		return cls_bboxes, cls_scores, cls_labels
-
 	def get_ocr(self, img, bbox, ocr_model, cfg_ocr, ocr_converter):
 		"""Initializes new Track objects and saves them for lowframe."""
+		bbox = bbox/self.scale_factor
 		x_min = int(bbox[0])
 		y_min = int(bbox[1])
 		x_max = int(bbox[2])
@@ -178,14 +150,14 @@ class Tracker_Low():
 			plate_string = 'NAN'
 		return plate_string
 
-
 	def reid(self, blob, frame, new_det_pos, new_det_scores, new_det_labels, do_reid, ocr_model, cfg_ocr, ocr_converter):
 		"""Tries to ReID with provided detections."""
+		if self.scale_int:
+			new_det_pos = new_det_pos / self.scale_factor
+		else:
+			new_det_pos = new_det_pos / new_det_pos[0].new_tensor(self.scale_factor)
+		new_det_features = self.reid_network.test_rois(img_meta[0]['reid_img'], new_det_pos).data
 
-		img_meta     = blob['img_meta'][0]
-		scale_factor = img_meta[0]['scale_factor']
-		new_det_features = self.reid_network.test_rois(img_meta[0]['reid_img'], new_det_pos/scale_factor).data		
-	
 		if do_reid:
 			# calculate appearance distances
 			dist_mat  = []
@@ -202,7 +174,7 @@ class Tracker_Low():
 						dist_mat.append(dist)
 				else:
 					dist_mat.append(torch.cat([t.test_features(feat.view(1,-1)) for feat in new_det_features], 0))
-					print(f'dist_mat: {dist_mat}')
+					#print(f'dist_mat: {dist_mat}')
 				pos.append(t.pos)
 			if len(dist_mat) > 1:
 				dist_mat = torch.cat(dist_mat, 0)
@@ -224,10 +196,10 @@ class Tracker_Low():
 				mat_shape = iou_mask.size()
 				dist_mat = dist_mat.resize_(mat_shape) * iou_mask.float() + iou_neg_mask.float()*1000
 			dist_mat = dist_mat.cpu().numpy()
-			print(f'dist_mat={dist_mat}')
+			#print(f'dist_mat={dist_mat}')
 
 			row_ind, col_ind = linear_sum_assignment(dist_mat)
-			print(len(col_ind))
+			print(f'ROW: {len(row_ind)} /n COL: {len(col_ind)}')
 			assigned = []
 			row_list = []
 			inactive = []
@@ -252,8 +224,8 @@ class Tracker_Low():
 					t = self.tracks[r]
 					t.pos = new_det_pos[idx].view(1,-1)
 					print(t.pos, t.pos[0][1])
-					if t.pos[0][1] > 450:
-						t.ocr = self.get_ocr(frame, t.pos[0], ocr_model, cfg_ocr, ocr_converter)
+					# if t.pos[0][1] > 450:
+					t.ocr = self.get_ocr(frame, scale_factor, t.pos[0], ocr_model, cfg_ocr, ocr_converter)
 					t.score = new_det_scores[idx]
 					t.label = new_det_labels[idx]
 					t.add_features(new_det_features[idx].view(1,-1))
@@ -285,16 +257,16 @@ class Tracker_Low():
 		"""Checks if inactive tracks should be removed."""
 		to_remove = []
 		for t in self.inactive_tracks:
-			print(f'Inactive Tracks: {t.pos} \n Purge? {t.is_to_purge()}')
+			#print(f'Inactive Tracks: {t.pos} \n Purge? {t.is_to_purge()}')
 			if t.is_to_purge():
 				to_remove.append(t)
 		for t in to_remove:
 			self.inactive_tracks.remove(t)
-		print(f'Clear Inactive: {to_remove}')
+		#print(f'Clear Inactive: {to_remove}')
 		
 	def get_appearances(self, blob):
 		"""Uses the siamese CNN to get the features for all active tracks."""
-		print(f'Get Appearances')
+		#print(f'Get Appearances')
 		img_meta = blob['img_meta'][0]
 		reid_img = img_meta[0]['reid_img']
 		scale_factor = img_meta[0]['scale_factor']
@@ -416,7 +388,7 @@ class Tracker_Low():
 					t.pos[0,2] = cxp_new + wp/2
 					t.pos[0,3] = cyp_new + hp/2
 
-	def step(self, blob, frame, ocr_model, cfg_ocr, ocr_converter):
+	def step(self, blob, frame, ocr_model, cfg_ocr, ocr_converter, frame_cnt):
 		"""This function should be called every timestep to perform tracking with a blob
 		containing the image information.
 		Input:
@@ -430,18 +402,25 @@ class Tracker_Low():
 		'std': array([58.395, 57.12 , 57.375], dtype=float32), 'to_rgb': True},
 		'reid_img': array(..)
 		"""
-		print(f'DETECTIONS')
+		#print(f'DETECTIONS')
 		# for t in self.tracks:
 		# 	t.last_pos = t.pos.clone()
-		# 	print(f'Last Get Pos: {t.last_pos}')
+		# 	#print(f'Last Get Pos: {t.last_pos}')
 		
 		###########################
 		# Look for new detections #
 		###########################
+		img_meta = blob['img_meta'][0]
+		self. scale_factor = img_meta[0]['scale_factor']
+		self.ocr_time = 0
+		self.proc_times = []
+
+		detect_start = time.time()
 		with torch.no_grad():
 			det_bboxes, det_labels = self.obj_detect(return_loss=False, track=True, regress=False, **blob)
 			det_scores = det_bboxes[:, 4]
 			det_bboxes = det_bboxes[:,:4]
+		self.proc_times.append(time.time()-detect_start)
 		print(f'Detection: Bbox={det_bboxes} \n \t Score={det_scores} \n \t Labels {det_labels}')
 
 		##################
@@ -449,8 +428,9 @@ class Tracker_Low():
 		##################
 		# num_tracks = 0
 		# nms_inp_reg = torch.zeros(0).cuda()
-		print(f'Track Length: {len(self.tracks)} \n')
+		#print(f'Track Length: {len(self.tracks)} \n')
 		# align
+		track_time = time.time()
 		if self.do_align:
 			self.align(blob)
 		# apply motion model
@@ -475,7 +455,7 @@ class Tracker_Low():
 			do_reid = False
 		if new_det_pos.nelement() > 0: 
 			new_det_pos, new_det_scores, new_det_features, new_det_labels = self.reid(blob, frame, new_det_pos, new_det_scores, new_det_labels, do_reid, ocr_model, cfg_ocr, ocr_converter)
-			print(f'New: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
+			#print(f'New: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
 
 		print('CREATE NEW TRACKS')
 		if new_det_pos.nelement() > 0:
@@ -489,26 +469,28 @@ class Tracker_Low():
 			track_ind = int(t.id)
 			if track_ind not in self.results.keys():
 				self.results[track_ind] = {}
-			img_meta = blob['img_meta'][0]
-			scale_factor = img_meta[0]['scale_factor']
-			try:
-				pos = t.pos[0] / scale_factor
-			except:
-				pos = t.pos[0] / t.pos[0].new_tensor(scale_factor)
+			if self.scale_int:
+				pos = t.pos[0] / self.scale_factor
+			else:
+				pos = t.pos[0] / t.pos[0].new_tensor(self.scale_factor)
 			sc = t.score
 			lb = t.label
 			ocr = t.ocr
-			print(f'Tracks: Index={track_ind} \n \t Pos={pos} \n \t label={lb}  \n \t label={ocr} ')
+			#print(f'Tracks: Index={track_ind} \n \t Pos={pos} \n \t label={lb}  \n \t label={ocr} ')
 			self.results[track_ind][self.im_index] = np.concatenate([pos.cpu().numpy(), np.array([sc]), np.array([lb]),  np.array([ocr])])
 
 		self.im_index += 1
 		self.last_image = blob['img'][0]
-	#	print(f'last image: {self.last_image}')
+	#	#print(f'last image: {self.last_image}')
 
 		self.clear_inactive()
+		self.proc_times.append(self.ocr_time)
+		self.proc_times.append(track_time)
+		self.proc_times.append(plate_count)
+		self.proc_times.append(frame_cnt)
 
 	def get_results(self):
-		return self.results
+		return self.results, self.proc_times
 
 class Track_Low(object):
 	"""This class contains all necessary for every individual track."""
@@ -539,14 +521,14 @@ class Track_Low(object):
 
 	def add_features(self, features):
 		"""Adds new appearance features to the object."""
-		print(f'Add Features')
+		#print(f'Add Features')
 		self.features.append(features)
 		if len(self.features) > self.max_features_num:
 			self.features.popleft()
 
 	def test_features(self, test_features):
 		"""Compares test_features to features of this Track object"""
-		print(f'Test Features')
+		#print(f'Test Features')
 		feat_list = []
 		if len(self.features) > 1:
 			feat_list = list(self.features)

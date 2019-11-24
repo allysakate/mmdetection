@@ -90,10 +90,10 @@ test_cfg = dict(
         nms_pre=1000,
         nms_post=1000,
         max_num=1000,
-        nms_thr=0.7, 
+        nms_thr=0.5, 
         min_bbox_size=0),
     rcnn=dict(
-        score_thr=0.3, nms=dict(type='nms', iou_thr=0.5), max_per_img=20),
+        score_thr=0.5, nms=dict(type='nms', iou_thr=0.5), max_per_img=20),
     track=dict(
         score_thr=0.5, nms=dict(type='nms', iou_thr=0.3), max_per_img=20),
     regress=dict(
@@ -104,7 +104,7 @@ test_cfg = dict(
 )
 # dataset settings
 dataset_type = 'MOTDataset'
-data_root = 'data/Track_Test/'
+data_root = '/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -147,8 +147,8 @@ data = dict(
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file='/media/allysakatebrillantes/MyPassport/DATASET/catchall-dataset/cvat/test/RESULT/test.pkl',
-        img_prefix='/media/allysakatebrillantes/MyPassport/DATASET/catchall-dataset/cvat/test/images/mmdet/',
+        ann_file='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/GT/Camera1/Detection/camera1.pkl',
+        img_prefix='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/GT/Camera1/Detection/images/',
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
@@ -177,13 +177,18 @@ work_dir = './work_dirs/faster_rcnn_r101_fpn_1x'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
+skip = 1
+show = False
+single = False
+checkpoint = 'checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth'
+video_name = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/ch01_07-12_10.35-1.mp4'
 
 tracktor = dict(
-    reid_weights='mmdet/models/tracktor/siamese/train/ep25036/ResNet_iter_25036.pth',
-    reid_config='mmdet/models/tracktor/siamese/train/ep25036/sacred_config.yaml',
+    reid_weights='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/ResNet_iter_25036.pth',
+    reid_config ='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/sacred_config.yaml',
     interpolate=False,
     write_images=True,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
-    output_dir = '/media/allysakatebrillantes/MyPassport/DATASET/Tracking/FRCNN/tracker_ocr',
+    output_dir = '/media/allysakatebrillantes/MyPassport/DATASET/Tracking/FRCNN',
     tracker=dict(        
         detection_thresh=0.5,
         regression_thresh=0.5,           #score threshold for keeping the track alive
@@ -197,7 +202,7 @@ tracktor = dict(
         warp_mode='cv2.MOTION_EUCLIDEAN',  # Which warp mode to use (cv2.MOTION_EUCLIDEAN, cv2.MOTION_AFFINE, ...)
         number_of_iterations=100,        # maximal number of iterations (original 50)
         termination_eps=0.00001,         # Threshold increment between two iterations (original 0.001)
-#        do_reid=True,                    # Use siamese network to do reid
+        previous_reid=False,                    # Use siamese network to do reid
         inactive_patience=10,            # How much timesteps dead tracks are kept and cosidered for reid
         reid_sim_threshold=10.0,          # How similar do image and old track need to be to be considered the same person
         reid_iou_threshold=0.2,         # How much IoU do track and image need to be considered for matching
@@ -205,18 +210,18 @@ tracktor = dict(
     )
 )        
 ocr = dict(
-    saved_model='mmdet/models/ocr/checkpoints/best_accuracy.pth',
+    saved_model='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/attn/123456/best_accuracy.pth',
     imgH=32,
     imgW=100,
     batch_max_length=25,
     rgb = False,
-    character='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#',
+    character='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#',
     sensitive= True,
     PAD= False,
-    Transformation=None,
-    FeatureExtraction='VGG',
+    Transformation='TPS',
+    FeatureExtraction='ResNet',
     SequenceModeling='BiLSTM',
-    Prediction='CTC',
+    Prediction='Attn',
     num_fiducial=20,
     input_channel=1,
     output_channel=512,

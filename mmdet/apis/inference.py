@@ -153,7 +153,10 @@ def show_result(img,
 def show_tracks_result(img,
                 tracks,
                 class_names,
-                frame_cnt
+                frame_cnt,
+                skip,
+                mot_result,
+                track_result
                 ):
     """Visualize the tracking results on the image.
 
@@ -174,26 +177,38 @@ def show_tracks_result(img,
     """
     colors = [(0, 0, 255),(0, 255, 0),(255, 0, 0),(255, 255, 0),(0, 255, 255),(255, 0, 255),(255, 255, 255),(0, 0, 0)]
 
+    key = frame_cnt // skip
     img = mmcv.imread(img)
     img = img.copy()
     for t_id,t in tracks.items():
         plate_color = colors[t_id % 8]
-        if frame_cnt in t.keys():
-            t_i = t[frame_cnt]
+        if key in t.keys():
+            t_i = t[key]
             x_min = int(t_i[0])
             y_min = int(t_i[1])
             x_max = int(t_i[2])
             y_max = int(t_i[3])
+
             left_top = (x_min, y_min)
             right_bottom = (x_max, y_max)
             cv2.rectangle(img, left_top, right_bottom, plate_color, 3)
+            plate_img = img[y_min:y_max,x_min:x_max]
             try:
-                plate_class = class_names[t_i[5]]
+                plate_class = class_names[t_i[5]-1]
             except:
-                plate_class = t_i[5]
-            label_text =  f'{t_id}_{plate_class}_{t_i[6]}' 
-            cv2.putText(img, label_text, (x_min, y_min - 2),cv2.FONT_HERSHEY_COMPLEX, 1, plate_color)
-    return img
+                plate_class = t_i[5]-1
+            label_text =  f'{t_id}_{plate_class}_{t_i[6]}'
+            cv2.imwrite(f'//media/allysakatebrillantes/MyPassport/DATASET/Thesis/Result/camera_ocr/{key}_{label_text}-{frame_cnt}.jpg',plate_img)
+            cv2.putText(img, label_text, (x_min, y_min - 2),cv2.FONT_HERSHEY_COMPLEX, 0.5, plate_color)
+
+            mot_res = [frame_cnt,t_id,x_min,y_min,x_max,y_max,-1,-1,-1,-1]
+            mot_result.append(mot_res)
+            result  = [frame_cnt,t_id,x_min,y_min,x_max,y_max,plate_class,t_i[6]]
+            track_result.append(result)
+
+
+    
+    return img, mot_result, track_result
 
 def show_result_pyplot(img,
                        result,

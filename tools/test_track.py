@@ -223,5 +223,4 @@ def main():
 
     print(time.time()-start_time)
 if __name__ == '__main__':
-    with Timer("Time for Tracking"):
-        main()
+    main()

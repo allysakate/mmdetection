@@ -1,15 +1,11 @@
-# Python Program to Convert seconds 
-# into hours, minutes and seconds 
-import datetime 
 import time
+import math
 
-class Timer(object):
-    def __init__(self, description):
-        self.description = description
-    def __enter__(self):
-        self.start = time.time()
-    def __exit__(self, type, value, traceback):
-        self.end = time.time()
-        interval =  self.end - self.start 
-        self.convert = datetime.timedelta(seconds = interval)
-        print(f"{self.description}: {self.convert}")
+def get_proctime(start_time):
+    t = time.time() - start_time
+    t_msec, t_sec = math.modf(t)
+    _, t_msec = math.modf(t_msec * 1000)
+    (t_min, t_sec) = divmod(t_sec,60)
+    (t_hour,t_min) = divmod(t_min,60)
+    proc_time = '{}hour:{}min:{}sec.{}msec'.format(t_hour,t_min,t_sec,t_msec)
+    return proc_time

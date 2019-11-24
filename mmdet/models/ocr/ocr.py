@@ -9,15 +9,15 @@ import torch.nn.functional as F
 from .dataset import image_transform
 from .model import Model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+import time
 
 def get_text(plate_img, ocr_model, cfg_ocr, ocr_converter):
+    ocr_time = time.time()
     image_tensor = image_transform(plate_img, imgH=cfg_ocr.imgH, imgW=cfg_ocr.imgW, keep_ratio_with_pad=cfg_ocr.PAD)
 
     # predict
     ocr_model.eval()
     with torch.no_grad():
-        print(image_tensor.size())
         batch_size = image_tensor.size(0)
         image = image_tensor.to(device)
         # For max length prediction
@@ -50,5 +50,5 @@ def get_text(plate_img, ocr_model, cfg_ocr, ocr_converter):
 
         # calculate confidence score (= multiply of pred_max_prob)
         confidence_score = pred_max_prob.cumprod(dim=0)[-1]
-        print(preds_str, confidence_score)
-        return preds_str
+        #print(preds_str, confidence_score)
+        return preds_str, ocr_time

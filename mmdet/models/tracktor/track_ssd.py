@@ -73,7 +73,6 @@ def single_gpu_test(detect_model, video_name, show, skip, single, tracktor_cfg, 
 
     mot_result   = []
     track_result = []
-    time_result  = []
     frame_cnt    = 0
 
     while(cap.isOpened()):
@@ -88,13 +87,11 @@ def single_gpu_test(detect_model, video_name, show, skip, single, tracktor_cfg, 
                 data = test_pipeline(data)
                 data = scatter(collate([data], samples_per_gpu=1), [device])[0]
                 
-                tracker.step(data, frame, ocr_model, cfg_ocr, ocr_converter, frame_cnt)
-                result, step_time = tracker.get_results()
-                print(result)
-                time_result.append(step_time)
+                tracker.step(data, frame, ocr_model, cfg_ocr, ocr_converter)
+                result = tracker.get_results()
                 img, mot_result, track_result = show_tracks_result(frame, result, detect_model.CLASSES, frame_cnt, skip, mot_result, track_result)
                 cv2.imshow('Tracking',cv2.resize(img,(1540,860)))
-                #cv2.imwrite(f'{output_dir}/{frame_cnt}.jpg',img)
+                cv2.imwrite(f'{output_dir}/{frame_cnt}.jpg',img)
                 ch = cv2.waitKey(1)
                 if ch == 27 or ch == ord('q') or ch == ord('Q'):
                     break
@@ -105,16 +102,10 @@ def single_gpu_test(detect_model, video_name, show, skip, single, tracktor_cfg, 
     cap.release()
     cv2.destroyAllWindows()
 
-    # track_column = ['framecnt', 'id', 'xmin', 'ymin', 'xmax', 'ymax', 'class', 'ocr']
-    # track_df = pd.DataFrame(track_result, columns=track_column)
-    # track_df.to_csv((f'{output_dir}/camera1_track.csv'), index=None)
-    # print('Track to CSV Done')
-
-    # print(time_result)
-    # time_column = ['detect_time', 'regress_time', 'ocr_time', 'track_time', 'plate_count', 'frame_cnt']
-    # time_df = pd.DataFrame(time_result, columns=time_column)
-    # time_df.to_csv((f'{output_dir}/camera1_times.csv'), index=None)
-    # print('Time to CSV Done')
+    track_column = ['framecnt', 'id', 'xmin', 'ymin', 'xmax', 'ymax', 'class', 'ocr']
+    track_df = pd.DataFrame(track_result, columns=track_column)
+    track_df.to_csv((f'{output_dir}/camera1_track.csv'), index=None)
+    print('Track to CSV Done')
 
     text_track = f'{output_dir}/mot_result.txt'
     if osp.exists(text_track):
@@ -129,7 +120,7 @@ def single_gpu_test(detect_model, video_name, show, skip, single, tracktor_cfg, 
 def main():
     
     start_time = time.time()
-    #config = 'configs/ssd_vgg16_mot.py'
+    # config = 'configs/ssd_vgg16_mot.py'
     config = 'configs/faster_rcnn_r101_fpn_1x_mot.py'
 
     cfg = mmcv.Config.fromfile(config)
@@ -177,6 +168,4 @@ def main():
                             ocr_model=ocr_model, cfg_ocr=cfg_ocr, ocr_converter=ocr_converter)
 
 if __name__ == '__main__':
-    vid_time = time.time()
     main()
-    print(f'Proc_time: {vid_time}')

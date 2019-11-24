@@ -110,8 +110,8 @@ data = dict(
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'Camera1/camera1.pkl',
-        img_prefix=data_root + 'Camera1/images/',
+        ann_file='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/GT/Camera1/Detection/camera1.pkl',
+        img_prefix='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/GT/Camera1/Detection/images/',
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(type='SGD', lr=1e-3, momentum=0.9, weight_decay=5e-4)
@@ -141,12 +141,18 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 
+skip = 1
+show = False
+single = True
+checkpoint = 'checkpoints/ssd_vgg_mot_110719-38442c1e.pth'
+video_name = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/ch01_07-12_10.35-1.mp4'
+
 tracktor = dict(
-    reid_weights='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/ResNet_iter_25245.pth',
-    reid_config='mmdet/models/tracktor/siamese/res50-mot17-batch_hard/sacred_config.yaml',
+    reid_weights='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/ResNet_iter_25036.pth',
+    reid_config='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/sacred_config.yaml',
     interpolate=False,
     write_images=False,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
-    output_dir = '/media/allysakatebrillantes/MyPassport/DATASET/Tracking/SSD/tracker',
+    output_dir = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Result/SSD',
     tracker=dict(        
         detection_thresh=0.4,
         regression_thresh=0.4,           # score threshold for keeping the track alive
@@ -160,10 +166,28 @@ tracktor = dict(
         warp_mode='cv2.MOTION_EUCLIDEAN',  # Which warp mode to use (cv2.MOTION_EUCLIDEAN, cv2.MOTION_AFFINE, ...)
         number_of_iterations=100,        # maximal number of iterations (original 50)
         termination_eps=0.00001,         # Threshold increment between two iterations (original 0.001)
-        do_reid=False,                    # Use siamese network to do reid
+        previous_reid=False,                 # Use siamese network to do reid
         inactive_patience=10,            # How much timesteps dead tracks are kept and cosidered for reid
         reid_sim_threshold=2.0,          # How similar do image and old track need to be to be considered the same person
         reid_iou_threshold=0.2,         # How much IoU do track and image need to be considered for matching
         img_scale = (1333, 800)
     )
-)    
+)
+ocr = dict(
+    saved_model='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/attn/123456/best_accuracy.pth',
+    imgH=32,
+    imgW=100,
+    batch_max_length=25,
+    rgb = False,
+    character='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#',
+    sensitive= True,
+    PAD= False,
+    Transformation='TPS',
+    FeatureExtraction='ResNet',
+    SequenceModeling='BiLSTM',
+    Prediction='Attn',
+    num_fiducial=20,
+    input_channel=1,
+    output_channel=512,
+    hidden_size=256
+)

@@ -1,6 +1,7 @@
 '''
 Usage:
 python tools/test.py configs/faster_rcnn_r101_fpn_1x_mot.py checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth  --out results/results_detect.pkl
+python tools/test.py configs/ssd_vgg16_mot.py checkpoints/ssd_vgg_mot_110719-38442c1e.pth  --out results/results_detect.pkl
 '''
 
 import argparse
@@ -20,7 +21,6 @@ from mmdet.core import coco_eval, results2json, wrap_fp16_model
 from mmdet.datasets import build_dataloader, build_dataset
 from mmdet.models import build_detector
 from tools.voc_eval import voc_eval
-from tools.exec_time import Timer
 
 
 def single_gpu_test(model, data_loader, show=False):
@@ -31,7 +31,7 @@ def single_gpu_test(model, data_loader, show=False):
     for i, data in enumerate(data_loader):
         with torch.no_grad():
             result = model(return_loss=False, rescale=not show, **data)
-            print(f'result: {result}')
+        
         results.append(result)
         if show:
             model.module.show_result(data, result)
@@ -174,6 +174,7 @@ def main():
 
     # build the model and load checkpoint
     model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
+    print(model, file=open("model.txt", "a"))
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
@@ -232,5 +233,4 @@ def main():
 
 
 if __name__ == '__main__':
-    with Timer('Time of Detection Test'):
-        main()
+    main()

@@ -85,79 +85,37 @@ def bbox_overlaps(boxes, query_boxes):
 	return out_fn(overlaps)
 
 
-def plot_sequence(tracks, db, output_dir):
+def plot_sequence(tracks,output_dir):
 	"""Plots a whole sequence
 
 	Args:
 		tracks (dict): The dictionary containing the track dictionaries in the form tracks[track_id][frame] = bb
-		db (torch.utils.data.Dataset): The dataset with the images belonging to the tracks (e.g. MOT_Sequence object)
 		output_dir (String): Directory where to save the resulting images
 	"""
 
-	print("[*] Plotting whole sequence to {}".format(output_dir))
+	if not osp.exists(output_dir):
+		os.makedirs(output_dir)
 
 	text_design = f'{output_dir}/res_track.txt'
 	if osp.exists(text_design):
 		os.remove(text_design)
 
-
-	if not osp.exists(output_dir):
-		os.makedirs(output_dir)
-
-	# infinte color loop
-	cyl = cy('ec', colors)
-	loop_cy_iter = cyl()
-	styles = defaultdict(lambda : next(loop_cy_iter))
-
 	#<frame>, <id>, <bb_left>, <bb_top>, <bb_width>, <bb_height>, <conf>, <x>, <y>, <z>
-	frame_no = 1
+	frame_no = 0
 	res_track = []
-	for i,v in enumerate(db):
-		img_meta = v['img_meta'][0].data[0]
-		im_path = img_meta[0]['filename']
-		im_name = osp.basename(im_path)
-		im_output = osp.join(output_dir, im_name)
-		im = cv2.imread(im_path)
-		im = im[:, :, (2, 1, 0)]
-
-		sizes = np.shape(im)
-		height = float(sizes[0])
-		width = float(sizes[1])
-
-		fig = plt.figure()
-		fig.set_size_inches(width / 100, height / 100)
-		ax = plt.Axes(fig, [0., 0., 1., 1.])
-		ax.set_axis_off()
-		fig.add_axes(ax)
-		ax.imshow(im)
-
-		for j,t in tracks.items():
-			if i in t.keys():
-				t_i = t[i]
-				res = [frame_no,j,t_i[0],t_i[1],t_i[2]-t_i[0],t_i[3]-t_i[1],-1,-1,-1,-1]
-				print(res)
-				res_track.append(res)
-				ax.add_patch(
-					plt.Rectangle((t_i[0], t_i[1]),
-							t_i[2] - t_i[0],
-							t_i[3] - t_i[1],
-							fill=False,
-							linewidth=4.0, **styles[j]))
-				try:
-					plate_class = CLASSES[t_i[5]-1]
-				except:
-					plate_class = t_i[5]-1
-				text = f'{j}_{plate_class}'
-				ax.annotate(text, (t_i[0] + (t_i[2] - t_i[0]) / 2.0, t_i[1] + (t_i[3] - t_i[1]) / 2.0),
-				            color=styles[j]['ec'], weight='bold', fontsize=10, ha='center', va='center')
-		
+	for t in tracks.items():
+		t[0]
+		if frame_no in t.keys():
+			t_i = t[frame_cnt]
+			x_min = int(t_i[0])
+			y_min = int(t_i[1])
+			x_max = int(t_i[2])
+			y_max = int(t_i[3])
+			res = [frame_no,t_id,x_min,y_min,x_max,y_max,-1,-1,-1,-1]
+			print(res)
+			res_track.append(res)
 		frame_no += 1
-		plt.axis('off')
-		# plt.tight_layout()
-		plt.draw()
-		plt.savefig(im_output, dpi=100)
-		plt.close()
-	print(res_track)
+
 	with open(text_design,'a') as textfile:
 		for res in res_track:
 			res = [str(r)  for r in res]

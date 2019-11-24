@@ -92,7 +92,8 @@ class ResNet(models.ResNet):
                 y0 -= 1
             else:
                 y1 += 1
-        im = image[:,y0:y1,0:x1]
+        print(f'rois: {y0,y1,x0,x1}, {image.shape}')
+        im = image[y0:y1,x0:x1]
         im = torch.from_numpy(im)
         im = trans(im)
         res.append(im)
