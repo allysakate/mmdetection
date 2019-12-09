@@ -14,7 +14,6 @@ from mmdet.ops.nms import nms_wrapper
 from .utils import bbox_overlaps, bbox_transform_inv, clip_boxes
 from mmdet.models.ocr import get_text
 import time
-from tools import exec_time
 
 class Tracker():
 	"""The main tracking file, here is where magic happens."""
@@ -71,21 +70,26 @@ class Tracker():
 	def add(self, img, new_det_pos, new_det_scores, new_det_features, new_det_labels, ocr_model, cfg_ocr, ocr_converter, valid=False):
 		"""Initializes new Track objects and saves them for lowframe."""
 		num_new = new_det_pos.size(0)
+	#	print(num_new)
 		for i in range(num_new):
 			bbox = new_det_pos[i].view(1,-1)[0]
 			width = bbox[2]-bbox[0]
 			height = bbox[3]-bbox[1]
 			if width/height > 2:
 				valid = True
+				# if bbox[1] > 450:
+				plate_string, ocr_time = self.get_ocr(img, bbox, ocr_model, cfg_ocr, ocr_converter)
+				# else:
+				# 	plate_string, ocr_time = 'NAN', 0
 			else:
 				valid = False
-			# if bbox[1] > 450:
-			plate_string, ocr_time = self.get_ocr(img, bbox, ocr_model, cfg_ocr, ocr_converter)
+				plate_string, ocr_time = 'NAN', 0
+
 			self.ocr_time += ocr_time
-			# 	if len(plate_string) < 6:
-			# 			plate_string = "None" 
-			# else:
-			# 	plate_string = "None"
+			if len(plate_string) > 4:
+				valid = True
+			else:
+				valid = False
 			if valid:
 				track_input = Track(new_det_pos[i].view(1,-1), new_det_scores[i], new_det_labels[i], self.track_num + i, plate_string,
 												new_det_features[i].view(1,-1),self.inactive_patience, self.max_features_num)
@@ -115,10 +119,8 @@ class Tracker():
 		#print(f'REGRESS TRACKS')
 		pos, lbl = self.get_pos()
 		# regress
-		regress_start = time.time()
 		with torch.no_grad():
 			bboxes, scores = self.obj_detect(return_loss=False, proposals=pos, track=True, regress=True, **blob)
-		self.proc_times.append(time.time()-regress_start)
 
 		base_label = torch.ones((list(scores.shape)[0],4),dtype=int)
 		label_index = torch.tensor((1,2,3,4),dtype=int)
@@ -129,9 +131,9 @@ class Tracker():
 		bbox_list = []
 		s = []
 		if self.single:
-			new_det_pos    = bboxes[:,:4]
-			new_det_scores = bboxes[:, 4]
-			new_det_labels = scores
+			cls_bboxes = bboxes[:,:4]
+			cls_scores = bboxes[:, 4]
+			cls_labels = scores
 		else:
 			for i in range(scores.size(0)):
 				cls_inds = scores[i][1:5] > self.detection_thresh
@@ -154,7 +156,7 @@ class Tracker():
 			cls_labels = torch.tensor(label_list).cuda()
 			cls_bboxes = torch.tensor(bbox_list).cuda()
 
-		print(f'Prediction: Bbox={cls_bboxes} \n \t Score={cls_scores} \n  \t Label={cls_labels}')
+	#	print(f'Prediction: Bbox={cls_bboxes} \n \t Score={cls_scores} \n  \t Label={cls_labels}')
 
 	#	#print(len(self.tracks))
 		for i in range(len(self.tracks)-1,-1,-1):
@@ -168,15 +170,17 @@ class Tracker():
 				else:
 					s.append(t.score)
 					t.pos = cls_bboxes[i].view(1,-1)
-					# if t.pos[0][1] > 450:
+					# if t.pos[0][1] > 650:
 					t.ocr, ocr_time = self.get_ocr(frame, t.pos[0], ocr_model, cfg_ocr, ocr_converter)
+					# else:
+					# 	ocr_time = 0
 					self.ocr_time += ocr_time
 					t.label = cls_labels[i]
 					#print(f'Regression MultiClass: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label} \n')
 			except:
 				self.tracks_to_inactive([t])
 				#print(f'ERROR: Reg To Inactive: Bbox={t.pos} \n \t Score={t.score} \n \t Label={t.label}')
-			print(f'reg_track:{t.pos} | {t.score} | {t.label}')
+		#	print(f'reg_track:{t.pos} | {t.score} | {t.label}')
 	
 		return torch.Tensor(s[::-1]).cuda()
 
@@ -236,8 +240,14 @@ class Tracker():
 			dist_mat = []
 			pos = []
 			for t in self.inactive_tracks:
-				dist_mat.append(torch.cat([t.test_features(feat.view(1,-1)) for feat in new_det_features], 1))
+				if new_det_features.size(0) == 1:
+					for feat in new_det_features:
+						dist = t.test_features(feat.view(1,-1))
+						dist_mat.append(dist)
+				else:
+					dist_mat.append(torch.cat([t.test_features(feat.view(1,-1)) for feat in new_det_features], 0))
 				pos.append(t.pos)
+
 			if len(dist_mat) > 1:
 				dist_mat = torch.cat(dist_mat, 0)
 				pos = torch.cat(pos,0)
@@ -435,15 +445,20 @@ class Tracker():
 		'std': array([58.395, 57.12 , 57.375], dtype=float32), 'to_rgb': True},
 		'reid_img': array(..)
 		"""
+
+		
+		img_meta = data['img_meta'][0]
+		self.scale_factor = img_meta[0]['scale_factor']
+
 		self.ocr_time = 0
+		self.track_time   = 0
+		self.regress_time = 0
 		self.proc_times = []
 		#print(f'DETECTIONS')
 		for t in self.tracks:
 			t.last_pos = t.pos.clone()
 			#print(f'Last Get Pos: {t.last_pos}')
-		
-		img_meta = data['img_meta'][0]
-		self.scale_factor = img_meta[0]['scale_factor']
+
 
 		###########################
 		# Look for new detections #
@@ -453,10 +468,10 @@ class Tracker():
 		with torch.no_grad():
 			det_bboxes, det_labels = self.obj_detect(return_loss=False, track=True, regress=False, **data)
 
-		print(f'Detection: Bbox: {det_bboxes} \n \t Labels {det_labels}')
+	#	print(f'Detection: Bbox: {det_bboxes} \n \t Labels {det_labels}')
 		self.proc_times.append(time.time()-detect_start)
 		
-		track_time = time.time()
+		track_start = time.time()
 		##################
 		# Predict tracks #
 		##################
@@ -471,8 +486,10 @@ class Tracker():
 			if self.motion_model:
 				self.motion()
 			#regress
+			regress_start = time.time()
 			regress_scores = self.regress_tracks(data,frame, ocr_model, cfg_ocr, ocr_converter)
 			##print(f'regress_scores: {regress_scores}')
+			self.regress_time = time.time()-regress_start
 
 			if len(self.tracks):
 
@@ -535,7 +552,7 @@ class Tracker():
 			new_track_bbox = torch.zeros(0).cuda()
 			new_track_label  = torch.zeros(0).cuda()
 
-		##print(f'new_track_bbox: {new_track_bbox, new_track_label}')
+	#	print(f'new_track_bbox: {new_track_bbox, new_track_label}')
 
 		if new_track_bbox.nelement() > 0:
 			nms_type = self.nms_cfg.pop('type', 'nms')
@@ -574,12 +591,12 @@ class Tracker():
 			new_det_scores = new_track_bbox[:, 4]
 			new_det_labels = new_track_label
 		
-			#print(f'New: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
+		#	print(f'New: Bbox={new_det_pos} \n \t Score={new_det_scores} \n \t Label={new_det_labels}')
 
 			# try to redientify tracks
 			#if self.vid_framerate < 24:
 			new_det_pos, new_det_scores, new_det_features, new_det_labels = self.reid(data, new_det_pos, new_det_scores, new_det_labels)
-			#print(f'reid: {new_det_pos} | {new_det_scores}')
+		#	print(f'reid: {new_det_pos} | {new_det_scores}')
 
 	
 			# add new
@@ -603,7 +620,7 @@ class Tracker():
 			lb = t.label
 			ocr = t.ocr
 			plate_count += 1
-			#print(f'Tracks: Index={track_ind} \n \t Pos={pos} \n \t label={lb}  \n \t label={ocr} ')
+		#	print(f'Tracks: Index={track_ind} \n \t Pos={pos} \n \t label={lb}  \n \t label={ocr} ')
 			self.results[track_ind][self.im_index] = np.concatenate([pos.cpu().numpy(), np.array([sc]), np.array([lb]),  np.array([ocr])])
 
 		self.im_index += 1
@@ -611,8 +628,11 @@ class Tracker():
 	#	#print(f'last image: {self.last_image}')
 
 		self.clear_inactive()
+
+		self.proc_times.append(self.regress_time)
 		self.proc_times.append(self.ocr_time)
-		self.proc_times.append(track_time)
+		self.track_time = (time.time()-track_start) - self.ocr_time
+		self.proc_times.append(self.track_time)
 		self.proc_times.append(plate_count)
 		self.proc_times.append(frame_cnt)
 

@@ -131,4 +131,5 @@ build_from_cfg/
 results/
 **/*.jpg
 **/*.pth
+**/*.avi
 mmdet/models/tracktor/siamese/

@@ -180,6 +180,7 @@ def show_tracks_result(img,
     key = frame_cnt // skip
     img = mmcv.imread(img)
     img = img.copy()
+    #cv2.line(img, (0, 650), (1920, 650), (255, 0, 0))
     for t_id,t in tracks.items():
         plate_color = colors[t_id % 8]
         if key in t.keys():

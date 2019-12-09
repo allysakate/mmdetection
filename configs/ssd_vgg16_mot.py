@@ -141,12 +141,6 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 
-skip = 1
-show = False
-single = True
-checkpoint = 'checkpoints/ssd_vgg_mot_110719-38442c1e.pth'
-video_name = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/ch01_07-12_10.35-1.mp4'
-
 tracktor = dict(
     reid_weights='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/ResNet_iter_25036.pth',
     reid_config='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/sacred_config.yaml',
@@ -191,3 +185,9 @@ ocr = dict(
     output_channel=512,
     hidden_size=256
 )
+
+skip = 3
+show = False
+single = True
+checkpoint = 'checkpoints/ssd_vgg_mot_110719-38442c1e.pth'
+video_name = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/ch01_07-12_10.35-1.mp4'

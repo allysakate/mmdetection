@@ -177,18 +177,13 @@ work_dir = './work_dirs/faster_rcnn_r101_fpn_1x'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
-skip = 1
-show = False
-single = False
-checkpoint = 'checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth'
-video_name = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/ch01_07-12_10.35-1.mp4'
 
 tracktor = dict(
     reid_weights='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/ResNet_iter_25036.pth',
     reid_config ='/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Models/siamese/train/ep25036/sacred_config.yaml',
     interpolate=False,
     write_images=True,     # compile video with=`ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
-    output_dir = '/media/allysakatebrillantes/MyPassport/DATASET/Tracking/FRCNN',
+    output_dir = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/Result/FRCNN',
     tracker=dict(        
         detection_thresh=0.5,
         regression_thresh=0.5,           #score threshold for keeping the track alive
@@ -227,5 +222,10 @@ ocr = dict(
     output_channel=512,
     hidden_size=256
 )
+skip = 1
+show = False
+single = False
+checkpoint = 'checkpoints/faster_crnn_r101_fpn_1x_mot_50ep_101019-a3b5c112.pth'
+video_name = '/media/allysakatebrillantes/MyPassport/DATASET/Thesis/ch01_07-12_10.35-1.mp4'
 
 #CUDA_VISIBLE_DEVICES=0 python3 demo.py --Transformation None --FeatureExtraction VGG --SequenceModeling BiLSTM --Prediction CTC --image_folder demo_image/ --saved_model checkpoints/best_accuracy.pth --sensitive
